@@ -1,4 +1,62 @@
-# nxnative
+# nxnative — Minecraft Dungeons II adaptation
+
+This repository is an experimental adaptation of [seedds/nxnative](https://github.com/seedds/nxnative)
+focused on **Minecraft Dungeons II**, title ID `0100A7C01B792000`, game version
+**1.1.3.0**, on Apple Silicon Mac and iPhone. The inherited games gallery below
+is upstream project information; other games have not been revalidated against
+this branch's shared host changes.
+
+## Changes for Minecraft Dungeons II
+
+- A version-specific [game profile](dm/games/0100A7C01B792000/README.md), memory
+  sizing and build-ID-gated Unreal Engine allocator adaptations.
+- A 60 fps target using the engine's frame-rate and presentation settings,
+  plus display frame history to resolve the startup swapchain wait.
+- SSL initialization fixes and optional native sockets, DNS, verified TLS and
+  an HTTPS web applet, enabled explicitly with `DM_NETWORK=1`.
+- A buffered TLS write fix for large cloud-save uploads, with transport,
+  TLS, SSL ABI, web and frame-history tests.
+
+These changes are committed as source and profile data. Repacking the supported
+game version with this repository applies them through the normal build pipeline.
+Shared host fixes also affect other game profiles where those paths are used;
+this branch does not guarantee compatibility with the entire upstream gallery.
+
+## Current support and limitations
+
+- Mac gameplay and iPhone startup/menus have been exercised. Menu runs measured
+  60 fps on both platforms; sustained iPhone combat performance and rendering
+  remain unverified. A 60 fps target does not guarantee sustained 60 fps.
+- Two uploads made by the original game succeeded in an isolated Mac
+  Microsoft-only login diagnostic after the TLS fix. **That login adapter still
+  depends on LLDB instrumentation and is not included as a standalone feature.**
+  A fresh build does not provide the complete Microsoft-only cloud-save flow.
+- Nintendo platform credentials are not implemented. Native networking alone
+  does not resolve the normal Switch client's account-link requirement.
+  Multiplayer and complete iPhone cloud synchronization remain unverified.
+- Host and graphics tests and the local 15,826-shader static regression passed;
+  this is not a gameplay regression test across all upstream games.
+
+## Build this adaptation
+
+Follow the upstream prerequisites and build instructions below, and the
+[game-specific reproduction notes](dm/games/0100A7C01B792000/README.md#reproducing-this-build).
+From the repository root:
+
+```sh
+# Build a Mac app.
+python3 scripts/build_ipa_from_nsp.py "/path/to/game-folder" -k "/path/to/prod.keys" --platform mac-app
+
+# Prepare an iPhone Xcode project; use your own team and device for signing.
+python3 scripts/build_ipa_from_nsp.py "/path/to/game-folder" -k "/path/to/prod.keys" --keep-extracted --prepare-xcode
+```
+
+Provide your own game files, keys and signing credentials. They are not included,
+and neither are account tokens or personal save data. Fixed-address adaptations
+are gated by module build IDs; new game versions require validation and may need
+updated profile patches. Shared host fixes and the build pipeline can be reused.
+
+## Upstream nxnative overview
 
 Play your own Nintendo Switch games natively on iPhone and iPad. Bring your game (its NSP files) and your `prod.keys`; one script turns them into an IPA that you sideload.
 
