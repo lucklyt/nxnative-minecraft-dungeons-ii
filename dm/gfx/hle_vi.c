@@ -2,6 +2,7 @@
 // Host: returns host static objects; when hooking up Metal, the native window corresponds to the front end's CAMetalLayer (front_metal_layer()).
 #include "../host/hle.h"
 #include <stdatomic.h>
+#include <pthread.h>
 
 static struct { uint32_t magic; } g_display = {0x50534944}, g_layer = {0x5259414c};
 static struct { uint32_t magic; void *layer; } g_native = {0x4e49574e, 0};
@@ -47,9 +48,46 @@ uint64_t dm_nvn_frame_count(void);
 HLE_FORCE("_ZN2nn2vi20GetLatestFrameNumberEPmPKNS0_5LayerE", "the layer's latest frame number: the frames presented so far", Result, h_vi_FrameNo, uint64_t *out, const void *layer) {
     (void)layer; *out = dm_nvn_frame_count(); return RES_OK;
 }
-HLE_FORCE("_ZN2nn2vi16ListFrameHistoryEPNS0_9FrameInfoEiPKNS0_5LayerE", "the layer's frame history: none kept, 0 entries", int, h_vi_FrameHist, void *out, int n, const void *layer) {
-    (void)out; (void)layer; static int once; if (!once++) LOG("vi::ListFrameHistory (%d entries asked): the host keeps no frame history, 0 returned", n);
-    return 0;
+// SDK 20.5.15's implementation returns capacity 8 for a null output or count 0.
+// FrameInfo is five u64s: state (1 dropped, 2 displayed), number, enqueue time,
+// earliest and latest display time, in guest-clock 19.2 MHz ticks. The SDK calls
+// os::ConvertToTick(TimeSpan) for each native timestamp (sdk+0x4510a0).
+// Unreal's Swapchain-depth fences need completed flip records, not just a count
+// of frames enqueued. Publishing GPU completion as a flip would release them early.
+enum { VI_HISTORY = 8 };
+typedef struct { uint64_t state, number, queued, displayed_min, displayed_max; } vi_frame_info;
+static pthread_mutex_t g_vi_history_mu = PTHREAD_MUTEX_INITIALIZER;
+static vi_frame_info g_vi_history[VI_HISTORY];
+static uint64_t g_vi_latest;
+static uint64_t vi_tick(uint64_t ns) { return (uint64_t)((__uint128_t)ns * 12 / 625); }
+void dm_vi_frame_queued(uint64_t number, uint64_t ns) {
+    if (!number) return;
+    pthread_mutex_lock(&g_vi_history_mu);
+    g_vi_history[number % VI_HISTORY] = (vi_frame_info){0, number, vi_tick(ns), 0, 0};
+    if (number > g_vi_latest) g_vi_latest = number;
+    pthread_mutex_unlock(&g_vi_history_mu);
+}
+void dm_vi_frame_done(uint64_t number, uint64_t displayed_ns) {
+    pthread_mutex_lock(&g_vi_history_mu);
+    vi_frame_info *f = &g_vi_history[number % VI_HISTORY];
+    if (number && f->number == number) {
+        f->state = displayed_ns ? 2 : 1;
+        f->displayed_min = f->displayed_max = vi_tick(displayed_ns);
+    }
+    pthread_mutex_unlock(&g_vi_history_mu);
+}
+HLE_FORCE("_ZN2nn2vi16ListFrameHistoryEPNS0_9FrameInfoEiPKNS0_5LayerE", "the layer's actual completed frame history, capacity 8", int, h_vi_FrameHist, void *out, int n, const void *layer) {
+    (void)layer;
+    if (!out || !n) return VI_HISTORY;
+    if (n < 0) return 0;
+    int count = 0;
+    pthread_mutex_lock(&g_vi_history_mu);
+    for (uint64_t k = g_vi_latest; k && g_vi_latest - k < VI_HISTORY && count < n; k--) {
+        vi_frame_info f = g_vi_history[k % VI_HISTORY];
+        if (f.number == k && f.state) memcpy((uint8_t *)out + sizeof f * count++, &f, sizeof f);
+    }
+    pthread_mutex_unlock(&g_vi_history_mu);
+    return count;
 }
 // Rhythm Heaven Groove (SDK 21) asks for the built-in panel's identity at start (main+0xa9a4); the SDK's version calls through the vi service object the host never made (SIGSEGV at +0x20).
 //   The game reads a u32 kind and, when it is 2 or more, 0x14 more bytes that it hands on; any other answer makes it hand on zeros. The host has no panel: an all-zero identifier, kind 0

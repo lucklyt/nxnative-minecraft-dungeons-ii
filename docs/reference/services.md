@@ -350,8 +350,15 @@ Most service calls can be found before they crash, before the first boot or the 
 
 - **Symptom:** SIGSEGV in `android::Surface::getQueuedFrameNumber` under `nn::vi::GetLatestFrameNumber`.
 - **Cause:** Unreal paces frames by the layer's frame number (`main+0x10140e8`); the SDK reads the vi service's surface, which the host never made.
-- **Fix:** `hle_vi.c` answers with the frames presented so far; `ListFrameHistory` returns no entries.
+- **Fix:** `hle_vi.c` answers with the frames presented so far. Frame history is recorded separately from actual presentation callbacks; see [Display frame history for swapchain fences](#display-frame-history-for-swapchain-fences).
 - **Found on:** [Octopath Traveler 0](../../dm/games/01005270232F2000/README.md).
+
+### Display frame history for swapchain fences
+
+- **Symptom:** startup movies finish, then the GameThread waits indefinitely in `FlushRenderingCommands`. RenderThread and RHIThread are idle, and all submitted GPU work has completed; a Swapchain-depth render fence remains incomplete.
+- **Cause:** the host returned 0 for `vi::ListFrameHistory(nullptr, 0, layer)`, which the SDK defines as a capacity query returning 8. Without completed flip records Unreal's frame-flip tracker cannot advance. Returning nanoseconds instead of `os::Tick` timestamps also prevents it from tracking flips correctly.
+- **Fix:** `hle_vi.c` keeps a synchronized ring of eight 40-byte FrameInfo records. The Metal present queue records enqueue times, actual drawable presentation callbacks record display times, and discarded frames remain discarded. The SDK 20.5.15 implementation (`sdk+0x4510a0`) verifies the capacity query, newest-first ordering, states 1/2 and the conversion to 19.2 MHz ticks. Enqueue and GPU completion alone never count as display completion. The host `vi-history` test covers the query, ABI, units, completed/dropped records and late callbacks after rollover.
+- **Found on:** [Minecraft Dungeons II](../../dm/games/0100A7C01B792000/README.md#startup-wait-after-the-movies) (1.1.3.0, Unreal Engine 5.6.1): the Mac now reaches its animated title and accessibility menus; gameplay and the phone update remain to be tested.
 
 ### Default display panel identifier
 
@@ -415,6 +422,29 @@ Most service calls can be found before they crash, before the first boot or the 
 - **Found on:** [Monster Hunter Rise](../../dm/games/0100B04011742000/README.md) (SDK 11: `album::Initialize`); [DRAGON QUEST XI S](../../dm/games/01006C300E9F0000/README.md) (SDK 7.3.2: `album::SaveScreenshot`); [Animal Crossing: New Horizons](../../dm/games/01006F8002326000/README.md) (SDK 20.5.4: the sharing calls); [Pokémon Legends: Z-A](../../dm/games/0100F43008C44000/README.md) (19.3.11: `SaveCurrentScreenshot`).
 
 ## Accounts, network, shop and parental controls
+
+### SSL context lifecycle while offline
+
+- **Symptom:** Xbox's first `HCInitialize` fails with `0x80004005`; the later `XblInitialize` calls `HCInitialize(null)`, returns `0x80070057` and the game aborts before its menu.
+- **Cause:** the HTTP provider creates an `nn::ssl::Context` during global initialization, before making any connection. Failing that local configuration object prevents the HTTP singleton from existing, even for offline play.
+- **Fix:** `hle_net.c` owns unique context IDs with synchronized create/destroy bookkeeping in the SDK object's first eight bytes. Duplicate creation and invalid destruction fail. Network availability, socket creation, SSL connections and handshakes still fail offline; initialization does not grant authentication or connectivity. The host lifecycle test covers those boundaries.
+- **Found on:** [Minecraft Dungeons II](../../dm/games/0100A7C01B792000/README.md#xbox-initialization) (1.1.3.0, SDK 20.5.15); verified past this abort on the Mac, with gameplay validation pending.
+
+### Optional native sockets, TLS and login web applet
+
+- **Symptom:** the game can initialize Xbox libraries offline but cannot reach a sign-in endpoint; `web::ShowWebPage` immediately fails.
+- **Cause:** the former offline service layer rejected socket, TLS connection and web applet operations unconditionally. Configuration-object initialization alone supplies no transport or account authentication.
+- **Fix:** `DM_NETWORK=1` enables the native BSD/DNS transport in `hle_net_transport.c` and verified TLS 1.2 in `hle_net_tls.c`. Horizon sockaddr, descriptor, resolver and readiness ABIs are translated explicitly. NSD `Resolve`/`ResolveEx` preserve bounded literal DNS names; unsupported environment placeholders still fail, and BSD DNS performs the actual address lookup; only registered guest descriptors may be used. Event counters preserve 64-bit accumulation, semaphore/nonblocking modes and read/write readiness, retaining their metadata while blocked I/O or Poll/Select owns a reference. Blocking native waits release the guest core. SecureTransport validates the server chain and hostname using Apple trust plus explicitly imported CAs. Unsupported device/client certificates, TLS 1.3-only contexts and Nintendo account credentials still fail. The SDK keeps its own resolver-option helpers: the observed key `0x2711` creates a local random request ID, so forcing those helpers to fail broke local configuration without implementing any network service. The host communication permission follows explicit network mode; no console parental-control database is present. Default mode remains offline. Native transport, certificate rejection, hostname rejection and local HTTPS tests cover these boundaries.
+- **Fix:** the libcurl C `nnssl*` entry points and C++ Result/out-byte overloads use the same TLS backend, including real certificate-chain buffers/details and ALPN. The SDK's ID getters are local field reads: a constructed context or connection with ID zero returns success, allowing libcurl to decide to create it. Rejecting that zero state caused repeated `nnssl_connect_common - 1097` messages before any connection was created. The handshake overload accepts an unregistered certificate buffer (`NULL/0`): successful verified TLS remains successful, with no exported certificate data. Its output-size/count pointers are optional, as in the SDK. The C ABI integration test covers zero-ID queries before creation/after destruction, handshake without certificate export, nonblocking results, certificate bytes, ALPN and HTTPS I/O.
+- **Fix:** `hle_web.c` parses bounded SDK Web applet TLVs and returns the SDK return-value ABI. `hle_web_ui.m` presents a native HTTPS WebKit view, keeps normal WebKit trust checks, supports cancellation and only returns a completed URL for the registered callback origin/path. URL, cookie and token values are not logged. The web view uses ephemeral storage; the game's own account/token persistence remains its responsibility.
+- **Found on:** [Minecraft Dungeons II](../../dm/games/0100A7C01B792000/README.md#network-validation) (SDK 20.5.15). Native HTTPS to Microsoft's login endpoint returned HTTP 200 with system trust; the user completed RemoteConnect authorization, and runtime observations confirmed a successful XAL identity and both service-token results. The normal client flow still fails its Nintendo native-proof stage (application error 29). Separately, a real Microsoft-only diagnostic obtained an existing-account PlayFab session, completed production Minecraft authentication, and read one cloud character from the verified GET list endpoint (all HTTP 200). This proves more than reachability, but it is not yet integrated client UI login, cloud restoration, or multiplayer; the game note records the boundary.
+
+### Large TLS uploads stall after successful login
+
+- **Symptom:** small HTTPS authentication/list requests succeed, but a save-sized PUT completes with HTTP status zero and retries. A local 1 MiB PUT with socket backpressure times out.
+- **Cause:** SecureTransport `SSLWrite` may buffer the entire plaintext and return `errSSLWouldBlock` with a nonzero processed count. The backend acknowledged that count before flushing the encrypted queue. The caller then waited for a response while the server still waited for the remaining request bytes. The upstream [curl SecureTransport backend](https://github.com/curl/curl/blob/curl-8_10_1/lib/vtls/sectransp.c) documents this distinction.
+- **Fix:** retain the buffered write length, return WOULD_BLOCK until an empty `SSLWrite` drains the queue, and acknowledge the buffered input once. Blocking mode waits and drains the same queue; reads retain their partial-read behavior. Certificate and hostname validation are unchanged. The local TLS integration test uploads 1 MiB through a small send buffer to a slow reader and verifies every payload byte; it timed out before this fix and passes afterward.
+- **Found on:** [Minecraft Dungeons II](../../dm/games/0100A7C01B792000/README.md#network-validation), SDK 20.5.15. The user's level-100/power-150 save was about 625 KiB. The original save body/SAS headers succeeded in a native HTTP comparison (201), and the rebuilt game itself subsequently returned real HTTP 201 and its successful save callback, including a second normal Save and Return to Main Menu test. This fixes upload transport; the separate Microsoft-only client provider integration remains experimental.
 
 ### Account, friends, play data and Nintendo Account calls
 

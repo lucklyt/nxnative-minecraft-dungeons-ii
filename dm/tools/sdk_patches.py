@@ -141,6 +141,12 @@ CUTS = {
     (0x145cbc, '08fca752', '087ca052', 'AddressRegionManager constructor: node area limit mov w8,#0x3fe00000 → mov w8,#0x3e00000'),
     (0x145d28, '09fca752', '097ca052', 'AddressRegionManager constructor: length of the node area registered as an occupied region mov w9,#0x3fe00000 → mov w9,#0x3e00000'),
   ],
+  # Minecraft Dungeons II 1.1.3.0 SDK 20.5.15: verified constructor and occupied-region
+  # registration at the same offsets as SDK 20.5.17; leave room for the capped Unreal region.
+  '190030518b5d64e5d87b84bc54661af9': [
+    (0x145cbc, '08fca752', '087ca052', 'AddressRegionManager constructor: node area limit 1022 MB -> 62 MB'),
+    (0x145d28, '09fca752', '097ca052', 'AddressRegionManager constructor: occupied node area 1022 MB -> 62 MB'),
+  ],
   # DRAGON QUEST VII Reimagined 1.2.0 (v131072) sdk (SDK 19.3.1): the same AddressRegionManager constructor as Octopath Traveler 0's SDK 19.3.13 build below, at the same offsets
   '145dde94fb574acc9e09780a11995bd3': [
     (0x1423fc, '08fca752', '087ca052', 'AddressRegionManager constructor: node area limit mov w8,#0x3fe00000 → mov w8,#0x3e00000'),

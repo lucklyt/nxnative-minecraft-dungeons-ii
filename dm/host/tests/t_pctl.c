@@ -1,9 +1,10 @@
-// pctl free communication offline policy (hle_misc.c, from PR #38): the hooks are looked up by their mangled names in the real swforce registrations, so a missing or misspelled
+// pctl free communication host network policy (hle_misc.c, from PR #38): the hooks are looked up by their mangled names in the real swforce registrations, so a missing or misspelled
 // takeover fails; no guest module, IPC session or system applet exists in this test
 #include "../hle_misc.c"
 #include <mach-o/getsect.h>
 
 static int unexpected, checks, fails;
+void dm_thread_native_wait(int entering) { (void)entering; }
 void *guest_sym(const char *name) { (void)name; unexpected++; return NULL; }
 module_t *module_of(const void *p) { (void)p; unexpected++; return NULL; }
 void hle_bind_system_event(void *g, int autoclear) { (void)g; (void)autoclear; unexpected++; }
@@ -24,6 +25,7 @@ static void *hook(const char *name) {
     return count == 1 ? fn : NULL;
 }
 int main(void) {
+    unsetenv("DM_NETWORK");
     // bool arguments are widened as hle.h requires (only the low 8 bits count); the returns are bools in w0, not nn::Result
     unsigned (*check)(unsigned) = hook("_ZN2nn4pctl32CheckFreeCommunicationPermissionEb");
     unsigned (*begin)(unsigned) = hook("_ZN2nn4pctl25TryBeginFreeCommunicationEb");
@@ -40,6 +42,13 @@ int main(void) {
         if (check) CHECK(check(args[i]) == 0, "ending communication does not grant permission");
         if (available) CHECK(available() == 0, "permission queries do not make communication available");
     }
+    setenv("DM_NETWORK", "1", 1);
+    if (check) CHECK(check(0) == 1, "explicit network mode permits communication");
+    if (begin) CHECK(begin(0) == 1, "begin agrees with explicit network mode");
+    if (available) CHECK(available() == 1, "communication available in explicit network mode");
+    if (end) end();
+    unsetenv("DM_NETWORK");
+    if (check) CHECK(check(0) == 0, "disabling network restores offline policy");
     CHECK(unexpected == 0, "no guest symbol lookup or event binding");
     printf("pctl: %d checks, %d failed\n", checks, fails);
     return fails != 0;

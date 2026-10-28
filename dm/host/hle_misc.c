@@ -1,3 +1,4 @@
+#include "net_transport.h"
 // Miscellaneous service layer: add-on content / shop / error applet / profanity filter / server name resolution / parental controls / software keyboard.
 // On the real device each goes through IPC or a system applet; the host gives results as single-player offline. Pure-computation SDK parts (hash, util, software Opus) are not taken over, the original implementation is used directly.
 #include "hle.h"
@@ -153,13 +154,16 @@ HLE_FORCE("_ZN2nn3ngc15ProfanityFilter24MaskProfanityWordsInTextEPiPDsj", "profa
 HLE_FORCE("_ZN2nn3ngc15ProfanityFilter11SetMaskModeENS1_8MaskModeE", "profanity mask mode; nothing is masked whatever the mode", void, h_ngc_MaskMode, void *self, int mode) { (void)self; (void)mode; }
 HLE_FORCE("_ZN2nn3ngc15ProfanityFilter8FinalizeEv", "profanity filter shutdown; the host mounted no word list", void, h_ngc_Fini, void *self) { (void)self; }
 
-// ---------- nsd server name resolution / pctl free communication: networking, out of scope ----------
-HLE_FORCE("_ZN2nn3nsd7ResolveEPNS0_4FqdnERKS1_", "server name resolution, networking out of scope; cut", Result, h_nsd_Resolve, void *out, const void *in) { (void)out; (void)in; return RES_FAIL; }
-HLE_FORCE("_ZN2nn3nsd9ResolveExEPNS0_4FqdnERKS1_", "server name resolution, networking out of scope; cut", Result, h_nsd_ResolveEx, void *out, const void *in) { (void)out; (void)in; return RES_FAIL; }
+// ---------- Optional native networking: literal NSD exchange and host communication policy ----------
+HLE_FORCE("_ZN2nn3nsd7ResolveEPNS0_4FqdnERKS1_", "literal NSD hostname exchange in explicit online mode", Result, h_nsd_Resolve, void *out, const void *in) { return dm_net_resolve_fqdn(out,in) ? RES_FAIL : RES_OK; }
+HLE_FORCE("_ZN2nn3nsd9ResolveExEPNS0_4FqdnERKS1_", "literal NSD hostname exchange in explicit online mode", Result, h_nsd_ResolveEx, void *out, const void *in) { return dm_net_resolve_fqdn(out,in) ? RES_FAIL : RES_OK; }
 // bool arguments only look at the low 8 bits; returns bool
-// The permission query answers as TryBegin / IsFreeCommunicationAvailable do: the SDK's version calls the pctl service (pctl::detail::ipc::GetService), which the host never opens (DRAGON QUEST XI S imports it; from PR #38)
-HLE_FORCE("_ZN2nn4pctl32CheckFreeCommunicationPermissionEb", "parental controls · permission to communicate with others, networking out of scope; never, no system UI", unsigned, h_pctl_CheckFree, unsigned show_ui) { (void)show_ui; return 0; }
-HLE_FORCE("_ZN2nn4pctl25TryBeginFreeCommunicationEb", "parental controls · communication with others, networking out of scope; never allowed", unsigned, h_pctl_TryBegin, unsigned show_ui) { (void)show_ui; return 0; }
+// The host has no console parental-control database. The former blanket denial
+// represented offline policy, not a user restriction. Explicit DM_NETWORK mode
+// permits native communication; remote account restrictions remain server enforced.
+// The SDK would otherwise connect to pctl::detail::ipc::GetService (DRAGON QUEST XI S).
+HLE_FORCE("_ZN2nn4pctl32CheckFreeCommunicationPermissionEb", "host communication permission follows explicit native network mode", unsigned, h_pctl_CheckFree, unsigned show_ui) { (void)show_ui; return dm_net_enabled(); }
+HLE_FORCE("_ZN2nn4pctl25TryBeginFreeCommunicationEb", "host communication permission follows explicit native network mode", unsigned, h_pctl_TryBegin, unsigned show_ui) { (void)show_ui; int allowed=dm_net_enabled(); LOG("network: communication request %s by host network mode", allowed ? "allowed" : "unavailable"); return allowed; }
 // Parental control of the 3D (VR goggles) mode, Super Mario Odyssey: no restriction, nothing to configure
 HLE_FORCE("_ZN2nn4pctl26GetStereoVisionRestrictionEv", "parental controls · 3D view restriction; never restricted", unsigned, h_pctl_GetStereo, void) { return 0; }
 HLE_FORCE("_ZN2nn4pctl26SetStereoVisionRestrictionEb", "parental controls · 3D view restriction; the host does not store it", void, h_pctl_SetStereo, unsigned on) { (void)on; }
@@ -167,7 +171,7 @@ HLE_FORCE("_ZN2nn4pctl42ConfirmStereoVisionRestrictionConfigurableEv", "parental
 HLE_FORCE("_ZN2nn4pctl53RequestStereoVisionRestrictionConfigurationPermissionEv", "parental controls · permission to change the 3D restriction; granted at once", Result, h_pctl_ReqStereo, void) { return RES_OK; }
 HLE_FORCE("_ZN2nn4pctl20EndFreeCommunicationEv", "parental controls · communication with others", void, h_pctl_End, void) {}
 // Engage asks on entering a battle map (no UI); without this the SDK connects to the pctl service through sm, which the host does not have, and aborts
-HLE_FORCE("_ZN2nn4pctl28IsFreeCommunicationAvailableEv", "parental controls · whether communication with others is available, networking out of scope; never", unsigned, h_pctl_IsFree, void) { return 0; }
+HLE_FORCE("_ZN2nn4pctl28IsFreeCommunicationAvailableEv", "host communication permission follows explicit native network mode", unsigned, h_pctl_IsFree, void) { return dm_net_enabled(); }
 // The Legend of Zelda: Breath of the Wild: checks the parental-control permission for stereoscopic 3D before VR-related screens (returns bool; the argument = whether to show UI, the game passes 0). The host has no parental controls: permitted
 HLE_FORCE("_ZN2nn4pctl27CheckStereoVisionPermissionEb", "parental controls · stereoscopic 3D permission; the host has no parental controls, allowed", unsigned, h_pctl_Stereo, unsigned show_ui) { (void)show_ui; return 1; }
 

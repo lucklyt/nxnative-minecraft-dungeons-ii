@@ -1,0 +1,42 @@
+# Minecraft Dungeons II: Unreal Engine 5.6.1, SDK 20.5.15, update 1.1.3.0
+# Format: see dm/games/README.md
+
+# ---- Identity ----
+title_id	0100A7C01B792000
+program_id	0100A7C01B792000
+
+# ---- App ----
+name	Minecraft Dungeons II
+ipa	MinecraftDungeonsIi.ipa
+app_category	public.app-category.games
+
+# ---- Versions ----
+build	v1	1.1.3.0	main=c6b32f4d3d4243ff190b082b4f6aea18	subsdk0=3904a8dee6801472d56bd4921378df27	sdk=190030518b5d64e5d87b84bc54661af9
+package	v1
+shader_versions	v1
+
+# ---- Files ----
+# every module main imports from
+modules	main subsdk0 sdk
+romfs_marker	Dungeons/Content/Paks/Dungeons-Switch.ucas
+zip_store	.cache:.headers:.mp4:.pak:.ttf:.txt:.ucas:.utoc:.metallib
+
+# ---- Memory ----
+# Cap Unreal address reservations after replacing FMallocBinned3 with the host zone.
+game_args	-SwitchVirtualAddressSpaceSize=4064
+# The build-gated allocator cut and SDK node-area cut let the capped engine region fit this block.
+mem_reserve	0x140000000
+mem_alias	0x118000000
+mem_stack	0x10000000
+app_pool	0xCD500000
+# the NPDM declares 20 MB of system resource
+sys_resource	0x1400000
+
+# ---- Frame rate ----
+# The build-gated Unreal cvar rows raise t.MaxFPS to 60 and rhi.SyncInterval to 1.
+fps_target	60
+
+# ---- Shader split ----
+# the decoded shader code archives: the engine's global shaders and the game's material shaders
+shader_groups	ShaderArchive-Global-=global ShaderArchive-=game
+shader_note	Minecraft Dungeons II shaders

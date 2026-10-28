@@ -39,6 +39,20 @@ run: $(B)/t_heap_size $(B)/t_touch $(B)/t_gesture $(B)/t_oe $(B)/t_fs $(B)/t_fs_
 	$(B)/t_symbols
 run: $(B)/t_nro
 run: $(B)/t_symbols
+run: ssl-context
+run: vi-history
+
+$(B)/t_vi_history: t_vi_history.c ../../gfx/hle_vi.c ../hle.h ../dm.h $(GAME_H) | $(B)
+	clang -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=undefined,address -I.. $(GINC) -o $@ t_vi_history.c
+.PHONY: vi-history
+vi-history: $(B)/t_vi_history
+	$(B)/t_vi_history
+
+$(B)/t_ssl_context: t_ssl_context.c ../hle_net.c ../hle_net_transport.c ../hle_net_tls.c ../net_transport.h ../net_tls.h ../hle.h ../dm.h $(GAME_H) | $(B)
+	clang -O1 -g -Wall -Werror -Wno-unused-function -Wno-deprecated-declarations -fsanitize=undefined,address -I.. $(GINC) -o $@ t_ssl_context.c ../hle_net_transport.c ../hle_net_tls.c -framework Security -framework CoreFoundation
+.PHONY: ssl-context
+ssl-context: $(B)/t_ssl_context
+	$(B)/t_ssl_context
 $(B)/t_symbols: t_symbols.c ../hle.c ../loader.c ../hle.h ../dm.h $(GAME_H) | $(B)
 	clang -O1 -g -Wall -Werror -Wno-unused-function -Wno-deprecated-declarations -I.. $(GINC) -o $@ t_symbols.c
 .PHONY: symbols
@@ -110,8 +124,8 @@ $(B)/t_swkbd: t_swkbd.c ../hle_swkbd.c ../hle.h ../dm.h $(GAME_H) | $(B)
 	clang -O1 -Wno-unused-function -I.. $(GINC) -o $@ t_swkbd.c ../hle_swkbd.c
 $(B)/t_altstack: t_altstack.c t_altstack_stub.c ../crash.c ../dm.h $(GAME_H) | $(B)
 	clang -O1 -Wno-unused-function -I.. $(GINC) -o $@ t_altstack.c t_altstack_stub.c ../crash.c
-$(B)/t_pctl: t_pctl.c ../hle_misc.c ../hle.h ../dm.h $(GAME_H) | $(B)
-	clang -O1 -Wall -Werror -Wno-unused-function -I.. $(GINC) -o $@ t_pctl.c
+$(B)/t_pctl: t_pctl.c ../hle_misc.c ../hle_net_transport.c ../net_transport.h ../hle.h ../dm.h $(GAME_H) | $(B)
+	clang -O1 -Wall -Werror -Wno-unused-function -I.. $(GINC) -o $@ t_pctl.c ../hle_net_transport.c
 $(B)/t_shared_font: t_shared_font.c ../hle_sdk16.c ../hle.h ../dm.h $(GAME_H) | $(B)
 	clang -O1 -Wall -Werror -Wno-unused-function -Wno-frame-address -I.. $(GINC) -o $@ t_shared_font.c
 $(B)/t_hid: t_hid.c ../hle_hid.c ../hle_haptics.c ../hle_haptics.h ../pad_slots.h ../dm_input.h ../hle.h ../dm.h $(GAME_H) | $(B)
@@ -188,3 +202,29 @@ notify-scheduler: $(B)/t_notify_sched
 	$(B)/t_notify_sched
 	$(B)/t_notify_sched --all-peers
 run: notify-scheduler
+
+# Optional native networking keeps the Horizon ABI at the boundary.
+$(B)/t_net_transport: t_net_transport.c ../hle_net_transport.c ../net_transport.h | $(B)
+	clang -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -o $@ t_net_transport.c ../hle_net_transport.c
+$(B)/t_web_args: t_web_args.c ../hle_web.c ../net_web.h $(GAME_H) | $(B)
+	clang -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined $(GINC) -o $@ t_web_args.c
+.PHONY: network
+network: $(B)/t_net_transport $(B)/t_web_args $(B)/t_web_urls
+	$(B)/t_net_transport
+	$(B)/t_web_args
+	$(B)/t_web_urls
+run: network
+$(B)/t_web_urls: t_web_urls.m ../hle_web_ui.m ../net_web.h | $(B)
+	clang -O1 -Wall -Werror -fobjc-arc -o $@ t_web_urls.m -framework Cocoa -framework WebKit
+$(B)/t_net_tls: t_net_tls.c ../hle_net_tls.c ../hle_net_transport.c ../net_tls.h ../net_transport.h $(GAME_H) | $(B)
+	clang -O1 -g -Wall -Werror -Wno-deprecated-declarations -fsanitize=address,undefined $(GINC) -o $@ t_net_tls.c ../hle_net_tls.c ../hle_net_transport.c -framework Security -framework CoreFoundation
+.PHONY: network-tls
+network-tls: $(B)/t_net_tls
+	$(PYTHON) test_net_tls.py $(B)/t_net_tls
+run: network-tls
+$(B)/t_ssl_c_abi: t_ssl_c_abi.c ../hle_net.c ../hle_net_tls.c ../hle_net_transport.c ../net_tls.h ../net_transport.h $(GAME_H) | $(B)
+	clang -O1 -g -Wall -Werror -Wno-unused-function -Wno-deprecated-declarations -fsanitize=address,undefined $(GINC) -o $@ t_ssl_c_abi.c ../hle_net_tls.c ../hle_net_transport.c -framework Security -framework CoreFoundation
+.PHONY: network-tls-c
+network-tls-c: $(B)/t_ssl_c_abi
+	$(PYTHON) test_net_tls.py $(B)/t_ssl_c_abi
+run: network-tls-c

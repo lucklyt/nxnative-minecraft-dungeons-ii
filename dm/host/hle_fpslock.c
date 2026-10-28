@@ -44,6 +44,10 @@ static const struct { const char *build, *what; uint64_t ptr_off; uint32_t field
     // (BaseSwitchDeviceProfiles.ini). Registered at main+0x33a4dec (float, IConsoleManager slot 2; AsVariableFloat stored at +0x10) and main+0x149e0bc (int, slot 1; AsVariableInt at +0x10)
     { "84e182f72ee1da4f477804bd05b54c15", "Unreal t.MaxFPS", 0x8c29af0 + 0x10, 0, FPS_F32, 2 },
     { "84e182f72ee1da4f477804bd05b54c15", "Unreal rhi.SyncInterval", 0x8adca10 + 0x10, 0, VSYNCS_I32, 2 },
+    // Minecraft Dungeons II 1.1.3.0 (UE 5.6.1): t.MaxFPS is registered at main+0x33eac48 (float, manager slot 2),
+    // rhi.SyncInterval at +0x147dc20 (int, slot 1). AsVariableFloat / Int is stored at +0x10, with game/render-thread copies.
+    { "c6b32f4d3d4243ff190b082b4f6aea18", "Unreal t.MaxFPS", 0xae27500 + 0x10, 0, FPS_F32, 2 },
+    { "c6b32f4d3d4243ff190b082b4f6aea18", "Unreal rhi.SyncInterval", 0xac96a10 + 0x10, 0, VSYNCS_I32, 2 },
     // OCTOPATH TRAVELER II 1.1.1: Unreal Engine 4.27's t.MaxFPS and rhi.SyncInterval, the same layout (names in UTF-16). The game's Switch device profile sets t.MaxFPS=30 and
     // rhi.syncinterval=2 (Majesty/Config/Switch/SwitchDeviceProfiles.ini; its Windows, PS4 and PS5 profiles set t.MaxFPS=60). Registered at main+0x2e50444 (float, AsVariableFloat stored at
     // +0x10) and main+0x134d380 (int, AsVariableInt at +0x10)
