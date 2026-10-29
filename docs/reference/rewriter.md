@@ -20,6 +20,25 @@ To enroll a cut for any game's own module:
 3. Add the rule under `MATCH_CUTS = {'main': [rule]}` (or the appropriate non-SDK module) in that game's `patches.py`. Record the evidence and remaining runtime validation in the game's note. Do not transplant a workaround into unrelated games.
 4. Verify an unregistered build-ID copy through the rewriter, comparing its output with the known fixed cut, and run `test_nso_match.py`, `test_patches.py` and `test_nro_pack.py`. The matching tests use synthetic modules from two profiles to check relocation, rejection and isolation without game files.
 
+## Signed per-build adapters
+
+A profile can define `STUBS = {build_id: function(ctx)}` for small adapters that
+must execute as part of the signed rewritten module. Like frame-step stubs,
+`ctx.here()` and `ctx.emit(word)` append instructions to the patch area,
+`ctx.site(offset, expected_hex)` asserts the original source bytes and rejects
+rewrite-window conflicts, and `ctx.put(offset, words, reason)` redirects a checked
+site and records it in the module's cuts table. Unlike `FRAME_STEP`, these adapters
+do not allocate a frame-state page. They are selected only by the exact module
+build ID; there is no automatic matching for unknown updates and no executable
+memory allocation or instruction patching at runtime.
+
+Found on [Minecraft Dungeons II](../../dm/games/0100A7C01B792000/README.md): two
+signed providers forward genuine cached Xbox audience tokens to the game's
+original callbacks. The game-specific code and object-layout checks live in its
+profile. The shared rewriter supplies only offline instruction emission and site
+validation. Synthetic ARM64 tests exercise credential absence and user separation;
+those tests do not establish successful backend or device authentication.
+
 ## Jump tables
 
 ### Offset jump tables through x18 read at rewrite time

@@ -14,6 +14,8 @@ this branch's shared host changes.
   plus display frame history to resolve the startup swapchain wait.
 - SSL initialization fixes and optional native sockets, DNS, verified TLS and
   an HTTPS web applet, enabled explicitly with `DM_NETWORK=1`.
+- Signed, build-gated Microsoft-only login adapters that forward the real
+  account's audience-specific tokens through the original game callbacks.
 - A buffered TLS write fix for large cloud-save uploads, with transport,
   TLS, SSL ABI, web and frame-history tests.
 
@@ -27,13 +29,16 @@ this branch does not guarantee compatibility with the entire upstream gallery.
 - Mac gameplay and iPhone startup/menus have been exercised. Menu runs measured
   60 fps on both platforms; sustained iPhone combat performance and rendering
   remain unverified. A 60 fps target does not guarantee sustained 60 fps.
-- Two uploads made by the original game succeeded in an isolated Mac
-  Microsoft-only login diagnostic after the TLS fix. **That login adapter still
-  depends on LLDB instrumentation and is not included as a standalone feature.**
-  A fresh build does not provide the complete Microsoft-only cloud-save flow.
-- Nintendo platform credentials are not implemented. Native networking alone
-  does not resolve the normal Switch client's account-link requirement.
-  Multiplayer and complete iPhone cloud synchronization remain unverified.
+- A fresh standalone Mac process restored the genuine Microsoft account and
+  completed an original game cloud-save upload with HTTP 201 after camp gameplay
+  and normal exit. Login no longer needs the earlier LLDB token-provider prototype.
+  A passive debugger observed only the upload result after login had completed.
+- The iPhone build with the new login adapters succeeded, but installation was
+  interrupted by device disconnection. **iPhone login and cloud synchronization
+  remain unverified.** Fresh authorization and credential-expiry recovery still
+  need validation; multiplayer is unverified.
+- Nintendo platform credentials are not implemented. This exact game profile
+  selects genuine Microsoft authentication when `DM_NETWORK=1` is enabled.
 - Host and graphics tests and the local 15,826-shader static regression passed;
   this is not a gameplay regression test across all upstream games.
 
@@ -41,6 +46,10 @@ this branch does not guarantee compatibility with the entire upstream gallery.
 
 Follow the upstream prerequisites and build instructions below, and the
 [game-specific reproduction notes](dm/games/0100A7C01B792000/README.md#reproducing-this-build).
+Enable networking with `DM_NETWORK=1` in the app's persistent `env.txt` as
+explained in the game-specific notes. A launch-only environment override does not
+persist when the app is later opened from its icon.
+
 From the repository root:
 
 ```sh

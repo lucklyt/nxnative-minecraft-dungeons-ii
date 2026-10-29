@@ -7,8 +7,12 @@ fixes reach the game on Mac and the menus on iPhone 16 Pro. Menu runs measured
 60 fps on both platforms; sustained combat performance and complete iPhone
 rendering remain unverified. The Mac Microsoft-only diagnostic reached gameplay
 and completed two original cloud-save uploads after the buffered TLS write fix.
-Its login token providers still require LLDB instrumentation and are not part of
-the standalone build. See the validation and open issues below.
+The current profile now supplies signed, build-gated Microsoft token-provider
+adapters. A fresh standalone Mac process restored the genuine Microsoft account
+and its original save upload returned HTTP 201 after gameplay and normal exit.
+The iPhone build succeeded, but installation was blocked by device disconnection;
+iPhone login and synchronization remain unverified. See the validation and open
+issues below.
 
 ## Reproducing this build
 
@@ -30,8 +34,9 @@ Networking is opt-in: add `DM_NETWORK=1` to the installed iPhone app's
 `Documents/env.txt`, or the Mac app's
 `~/Library/Application Support/nxnative/0100A7C01B792000/env.txt`, one setting per
 line, and restart. This enables native transport and the HTTPS web applet;
-it does not supply Nintendo credentials or enable the experimental Microsoft-only
-login adapter. Default builds remain offline. Multiplayer is unverified.
+for this exact game build it also selects the genuine Microsoft-only login flow
+and audience-token adapters. It does not supply Nintendo credentials. Default
+builds remain offline. Multiplayer is unverified.
 
 The tested game version is **1.1.3.0**. Fixed-address patches and host hooks are
 gated by module build IDs and checked against the expected instructions. For a
@@ -177,7 +182,7 @@ service-token Result/ResultSize calls succeeding (`+0x42450e4`, `+0x42451c8`),
 and the final Microsoft identity result (`+0x4243b10`) with HRESULT zero and a
 non-null user. No credentials, token values or user identifiers were logged.
 
-**Current client blocker:** the next stage requests the primary platform's native auth
+**Historical Switch client blocker:** the next stage requests the primary platform's native auth
 proof. Runtime dispatch at `+0x4280ba8` selects `+0x5cb76c0`, whose identity
 method at `+0x5cb7780` is the Nintendo provider `+0x42565e0` with local user
 index zero. Its automatic-login request is accepted (`+0x4255278`), but the
@@ -267,10 +272,32 @@ so an empty Online Heroes filter does not imply failed offline-hero cloud saves.
 The list summary can remain unchanged while the separate save blob is updated.
 No other hero was intentionally played or selected for these tests.
 
-**Open:** integrate this real Microsoft-only chain into client identity restoration,
-token providers and existing response callbacks; verify game UI cloud selection,
-persistent restoration, iOS installation and multiplayer. The normal Switch client
-still requests Nintendo proof, despite the successful Microsoft-only diagnostic.
+**Resolved on standalone Mac (2026-10-29):** the profile now emits signed login
+adapters through `STUBS`, without a debugger or runtime code generation. The
+network-enabled primary selector uses the shipped GDK factory and real XAL
+interactive async/result pair. Its two audience providers locate the actual
+Microsoft account map, check sparse allocation bits, object vtables and local
+user index, and forward the existing PlayFab (`+0x98`) or Minecraft (`+0x88`)
+FString to the original callback. Missing users or empty tokens use the original
+provider and its error path. No authentication results or credentials are forged.
+The original offline primary-factory selection is preserved when networking is
+disabled.
+
+A fresh Mac launch, with no login debugger attached, restored the cached account
+and displayed it as linked in Settings. With the existing level-100 hero, cloud
+saves enabled, camp movement and normal Save and Return to Main Menu, the
+game's original upload returned HTTP 201 and its completion reported status 200.
+A passive debugger was attached only after login to observe that original upload;
+it supplied no tokens and changed no response. Nine synthetic ARM64 execution
+tests cover audience selection, missing credentials, local-user separation,
+sparse holes and online/offline factory selection (`test_minecraft_primary.py`,
+optional `unicorn` package; no game files, credentials or network required).
+
+**Open:** verify fresh authorization, credential expiry/recovery, cloud character
+selection and synchronization on iPhone, and multiplayer. The signed iPhone build
+with these adapters succeeded, but installation failed when the connected device
+became unavailable. Nintendo proof is still absent; the network-enabled profile
+uses genuine Microsoft credentials instead.
 Offline-hero cloud synchronization is now enabled for the user-requested level-100
 upload test. Preserve the separate level-one local test hero and existing cloud data.
 

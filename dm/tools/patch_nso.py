@@ -66,6 +66,7 @@ else:
 #   CUTS = {build ID: [(offset, original bytes, new bytes, reason)]}: before rewriting, the original bytes are asserted one by one and any mismatch aborts (listed in <name>.cuts.tsv)
 #   OBS = {build ID: [(offset, number, original instruction word, reason)]}: observation gates. Numbers match OBS_* in the host's hle.h; the original instruction must be position
 #     independent (no PC-relative / branch / anything involving x18 or tpidr), asserted offline; when the host has no callback attached the gate block goes in and out once and returns
+#   STUBS = {build ID: function(ctx)}: signed per-build adapters; ctx.here/emit/site/put as below, without a frame-state page
 #   FRAME_STEP = {build ID: function(ctx)}: the frame step stubs of a main ("Frame step in whole vsyncs" below)
 #   MATCH_CUTS = {module name: [nso_match rule, ...]}: fallback for modules without registered CUTS. Only the profile selected by DM_GAME participates; a derived profile uses
 #     the repository's rules, an external-only provisional profile its own. Missing or ambiguous matches are reported and skipped; known builds retain their exact CUTS.
@@ -77,7 +78,7 @@ patch_paths = {}
 for path in PATCH_FILES: patch_paths.setdefault(os.path.realpath(path), path)   # repeated roots and symlinks name the same file, not competing build claims
 PATCH_FILES = list(patch_paths.values())
 def load_patches():
-    tables, where = {'CUTS': {}, 'OBS': {}, 'FRAME_STEP': {}, 'MATCH_CUTS': {}}, {}
+    tables, where = {'CUTS': {}, 'OBS': {}, 'FRAME_STEP': {}, 'STUBS': {}, 'MATCH_CUTS': {}}, {}
     for n, path in enumerate(PATCH_FILES):
         spec = importlib.util.spec_from_file_location(f'patches_{n}', path); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
         for kind, table in tables.items():
@@ -1023,6 +1024,21 @@ if BUILD_ID in FRAME_STEP and NAME == 'main':
 if FS_STATE_OFF:   # the build's stubs (FRAME_STEP of its patches.py)
     fs = types.SimpleNamespace(here=here, emit=emit, site=fs_site, put=fs_put, state=FS_STATE_OFF, render_scale=0)
     FRAME_STEP[BUILD_ID](fs); RENDER_SCALE = fs.render_scale
+
+# Build-specific signed adapters, assembled offline with the same checked site
+# contract as frame-step stubs. This does not add executable memory at runtime.
+if BUILD_ID in PATCHES['STUBS']:
+    def stub_site(off, orig):
+        ob = bytes.fromhex(orig)
+        assert IMG[off:off + len(ob)] == ob, f'adapter original bytes mismatch {off:#x}'
+        for o in range(off, off + len(ob), 4):
+            assert o not in kinds and not any(seg[0].address <= o < seg[-1].address + 4 for seg in windows), f'adapter site is a rewrite site {o:#x}'
+    def stub_put(off, words, why):
+        old = bytes(IMG[off:off + 4 * len(words)])
+        stub_site(off, old.hex())
+        for i, w in enumerate(words): struct.pack_into('<I', IMG, off + 4 * i, w)
+        cuts.append((off, old.hex(), bytes(IMG[off:off + 4 * len(words)]).hex(), why)); stat('adapter')
+    PATCHES['STUBS'][BUILD_ID](types.SimpleNamespace(here=here, emit=emit, site=stub_site, put=stub_put))
 
 # ---- Spin waits (every module) ----
 # A guest loop that polls memory until another thread changes it fills only its own core on the Switch, where any higher-priority thread pinned there preempts it, so the

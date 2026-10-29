@@ -41,7 +41,7 @@ def builds_of(g):   # {build ID: module name} of a profile's build rows (a profi
 
 class Registry(unittest.TestCase):
     def test_no_build_claimed_twice(self):
-        for kind in ('CUTS', 'OBS', 'FRAME_STEP'):
+        for kind in ('CUTS', 'OBS', 'FRAME_STEP', 'STUBS'):
             seen = {}
             for p, m in MODS.items():
                 for bid in getattr(m, kind, {}):
@@ -56,9 +56,9 @@ class Registry(unittest.TestCase):
             for bid, gates in getattr(m, 'OBS', {}).items():
                 for off, oid, word, why in gates:
                     self.assertTrue(isinstance(off, int) and isinstance(oid, int) and HEX.match(word) and len(word) == 8 and why, f'{p} {bid} {off:#x}')
-            for bid, fn in getattr(m, 'FRAME_STEP', {}).items():
+            for bid, fn in (list(getattr(m, 'FRAME_STEP', {}).items()) + list(getattr(m, 'STUBS', {}).items())):
                 self.assertTrue(callable(fn), f'{p} {bid}')
-            self.assertFalse({k for k in vars(m) if k.isupper() and k not in ('CUTS', 'OBS', 'FRAME_STEP', 'MATCH_CUTS')} - set(dir(__import__('nso_asm'))),
+            self.assertFalse({k for k in vars(m) if k.isupper() and k not in ('CUTS', 'OBS', 'FRAME_STEP', 'STUBS', 'MATCH_CUTS')} - set(dir(__import__('nso_asm'))),
                              f'{p}: a table patch_nso.py does not read')
 
     def test_function_match_rules(self):
@@ -75,7 +75,7 @@ class Registry(unittest.TestCase):
         for p, m in MODS.items():
             if p.name != 'patches.py': continue
             own = builds_of(p.parent.name)
-            for kind in ('CUTS', 'OBS', 'FRAME_STEP'):
+            for kind in ('CUTS', 'OBS', 'FRAME_STEP', 'STUBS'):
                 for bid in getattr(m, kind, {}):
                     self.assertIn(bid, own, f'{p}: {kind} of {bid}, which is no build of profile {p.parent.name}')
                     self.assertNotEqual(own[bid], 'sdk', f'{p}: {bid} is an sdk build; its patches go in dm/tools/sdk_patches.py')
@@ -100,16 +100,16 @@ class ExternalRegistry(unittest.TestCase):
         return p
 
     def registry(self, roots=None):
-        ns = dict(__file__=str(self.tools / 'patch_nso.py'), os=os, glob=glob, importlib=importlib)
+        ns: dict = dict(__file__=str(self.tools / 'patch_nso.py'), os=os, glob=glob, importlib=importlib)
         with mock.patch.dict(os.environ, DM_GAMES_DIR=os.pathsep.join(map(str, roots or [self.external]))):
             exec(REGISTRY_CODE, ns)
         return ns['PATCHES'], ns['PATCH_WHERE']
 
     def test_external_registered_patches_are_loaded(self):
         bid = '5e' * 16
-        p = self.patch_file(self.external, f"CUTS = {{'{bid}': []}}\nOBS = {{'{bid}': []}}\nFRAME_STEP = {{'{bid}': lambda ctx: None}}\n")
+        p = self.patch_file(self.external, f"CUTS = {{'{bid}': []}}\nOBS = {{'{bid}': []}}\nFRAME_STEP = {{'{bid}': lambda ctx: None}}\nSTUBS = {{'{bid}': lambda ctx: None}}\n")
         tables, where = self.registry()
-        for kind in ('CUTS', 'OBS', 'FRAME_STEP'):
+        for kind in ('CUTS', 'OBS', 'FRAME_STEP', 'STUBS'):
             self.assertIn(bid, tables[kind]); self.assertEqual(Path(where[kind, bid]), p)
 
     def test_derived_profile_keeps_repository_match_rules(self):
