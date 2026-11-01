@@ -12,10 +12,10 @@ and completed two original cloud-save uploads after the buffered TLS write fix.
 The current profile now supplies signed, build-gated Microsoft token-provider
 adapters. A fresh standalone Mac process restored the genuine Microsoft account
 and its original save upload returned HTTP 201 after gameplay and normal exit.
-The corrected iPhone build reaches the local character menu and visibly opens
-Microsoft authorization from Settings; completed iPhone login and synchronization
-remain unverified. See the validation and open
-issues below.
+The signed iPhone build completes genuine Microsoft login from Settings and
+original level-100 cloud-save uploads (HTTP 201, final status 200). Automatic
+cold restoration and primary-account status reporting passed signed-device tests;
+see the validation and open issues below.
 
 ## Reproducing this build
 
@@ -348,8 +348,9 @@ Switch's session logout also signs out the secondary Microsoft identity. Here
 that identity is the actual primary platform user. The `main+0x52af010` adapter
 keeps it across game-session/title transitions only when online, kind 0 and
 actually signed in, while continuing original game-session teardown. Other
-kinds, offline and signed-out users retain original identity logout. Explicit
-Settings unlink at `main+0x4767bd0` remains unchanged. A bounded phone experiment
+kinds, offline and signed-out users retain original identity logout. Identity logout outside that automatic teardown remains original. The call at
+`main+0x4767bd0` belongs to account-mismatch rejection, not the explicit Unlink
+UI; its earlier description as explicit unlink was incorrect. A bounded phone experiment
 first verified this lifetime adjustment; the final signed build then passed
 Settings, Continue and title re-entry without any runtime flow adjustment.
 
@@ -370,10 +371,60 @@ updated Xcode installation's missing MetalToolchain; its official component
 download failed to retrieve a matching catalog. This is not a regression pass,
 and no shader-chain lock was changed to conceal it.
 
-**Open:** the Settings linked-label still uses the secondary association cache;
-cold launch does not automatically restore the game session (open Settings and
-Link again); primary-login failure completion and credential expiry/recovery
-need further validation. Multiplayer is not established by cloud-save success.
+**Microsoft primary restore and status (2026-11-01):** the profile now uses the
+real primary identity status for all three linked/signed-in status getters,
+checking provider kind 0 and the controller's actual local player. The signed
+iPhone Settings screen displays the real Microsoft nickname, the linked-account
+description and the original Unlink action. No secondary association ID is
+invented, and other provider kinds retain the original cache checks.
+
+A successful original Minecraft login writes `save0:/nxnative-ms-primary-v1`
+through the game's existing SDK file operations and save transaction. The
+24-byte record contains an eight-byte `NXMSRP1` magic/terminator, a 32-bit local
+player index, a 32-bit version (1) and the actual 64-bit XUID. The ID comes from
+GetUniquePlayerId and the ID object's own ToString, with bounded decimal checks;
+it is not the nickname or either audience token. Temporary FString/shared
+references are released through the game's own allocation/reference paths.
+No password, refresh token or service credential is copied into this record.
+
+On cold entry, that versioned player-owned record permits an authentication
+attempt through the original XalTryAddUserByIdAsync (`main+0x703c930`) and matching
+result (`main+0x703ca90`). A private matching completion reuses the original user
+installation, delegates, HRESULT and cleanup. The interactive async/result pair
+remains available for explicit Settings login. Missing, malformed, truncated,
+wrong-version or different-player records do not start a restore; offline mode
+retains the local flow. File presence never reports authentication success.
+Actual Microsoft identity logout invalidates the matching record, as does a
+failed ById result. The original game failure handling remains in use.
+
+Two complete standalone iPhone restarts restored the genuine Microsoft account
+and one cloud character, without entering Settings or requesting another device
+code. The second used the app's persistent network setting, rather than a
+launch-only network override. After cold restoration, the level-100/power-150
+hero entered gameplay, moved/attacked and used Save and Return to Main Menu.
+Passive observers attached only afterward confirmed HTTP 201 and final status
+200 again; neither login nor gameplay used debugger flow/code/credential edits.
+
+An isolated Mac copy containing the real ID record but no authorization cache
+returned actual XAL HRESULT `0x8923510f`, original failure enum 997 and application
+error 21. It removed the restore record; normal title input then reached the
+local menu and Settings, captured in a screenshot. No false login success or
+endless automatic retry was introduced. Existing installs need one successful
+Settings login after upgrading to create this record; fresh users still choose
+Settings to authorize explicitly. The tested phone has already done that step.
+
+Forty-six ARM64 adapter tests, fourteen registry tests and four documentation
+tests pass, including SDK file I/O, record validation/ownership, matching XAL
+result callbacks, real-error propagation and identity-status behavior. Current
+source matches all 3,008 rewritten adapter bytes. Mac host and signed iOS builds
+pass; Python lint has zero new findings. The current cross-game regression
+attempt remains blocked by missing locked macOS/iPhoneOS Metal tools (report
+`20261101-203709-chain`); the shader-chain lock was not changed.
+
+**Open:** primary-login failure completion from a live Settings operation,
+revoked/expired-token recovery beyond the missing-cache case, and the backend
+Unlink action need further validation. Multiplayer is not established by
+cloud-save success.
 
 ## Startup wait after the movies
 

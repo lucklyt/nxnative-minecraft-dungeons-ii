@@ -38,14 +38,20 @@ this branch does not guarantee compatibility with the entire upstream gallery.
   A standalone run entered the level-100 hero, moved/attacked and saved through
   the original game UI. Passive observers attached afterward confirmed upload
   HTTP 201 and final status 200, with no runtime code or credential adjustments.
-- Settings still displays the secondary-account "unlinked" label. Completely
-  restarting the app requires opening Settings and selecting Link again; genuine
-  cached authorization can be reused. Automatic cold restore, login-failure UI
-  completion, credential expiry/recovery and multiplayer remain open.
+- Signed-device tests now pass two complete restarts with automatic genuine
+  Microsoft-account restoration. Settings displays the actual account nickname
+  and linked state. A small player-owned record stores only the real XUID;
+  the original XAL authorization cache and servers still authenticate the user.
+  Missing authorization is rejected and returns to a usable manual-login path.
+- Existing installs need one successful Settings login after upgrading to create
+  that restore record; fresh users authorize there explicitly. The first tested
+  phone is already migrated. Live Settings failure completion, revoked-token
+  recovery beyond the missing-cache test, Unlink and multiplayer need further
+  validation.
 - Nintendo platform credentials are not implemented. This exact game profile
   selects genuine Microsoft authentication when `DM_NETWORK=1` is enabled.
 - The earlier local 15,826-shader static regression passed. Current host tests,
-  29 ARM64 login-adapter tests, 14 registry tests, four documentation tests and
+  46 ARM64 login-adapter tests, 14 registry tests, four documentation tests and
   Python lint (zero new findings) pass. The latest cross-game regression attempt
   is blocked by Xcode's missing MetalToolchain and unavailable component catalog;
   it is not a new regression pass or a cross-game gameplay guarantee.

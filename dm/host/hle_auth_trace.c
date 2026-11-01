@@ -29,8 +29,8 @@ static void auth_cloud_response(const uint64_t *regs) {
         LOG("auth: original cloud-list character delivery (characters=%u)", count);
     else LOG("auth: original cloud-list character delivery (count unavailable)");
 }
-static void auth_xal_begin(const uint64_t *regs) { LOG("auth: XAL interactive start HRESULT=%#x", (unsigned)regs[0]); }
-static void auth_xal_result(const uint64_t *regs) { LOG("auth: XAL interactive result HRESULT=%#x", (unsigned)regs[0]); }
+static void auth_xal_begin(const uint64_t *regs) { LOG("auth: XAL add-user start HRESULT=%#x", (unsigned)regs[0]); }
+static void auth_xal_result(const uint64_t *regs) { LOG("auth: XAL add-user result HRESULT=%#x", (unsigned)regs[0]); }
 static void auth_failure(const uint64_t *regs) { LOG("auth: original login failure enum=%u", (unsigned)regs[24]); }
 static void auth_device_code(const uint64_t *regs) {
     // This build's parser returns a libc++ string in fp-0x20 before moving it
