@@ -19,7 +19,7 @@ this branch's shared host changes.
 - **Networking enabled by default:** no configuration-file editing is needed
   after installing a newly built app.
 
-Start with the [build, sign-in and cloud-save guide](#build-sign-in-and-use-cloud-saves).
+Start with the [build and installation guide](#build-and-install).
 Bring your own game files and account; no personal saves or credentials are
 included in this repository.
 
@@ -57,7 +57,7 @@ attempt is blocked by missing locked Metal tools; it is not a cross-game
 compatibility guarantee. See the game-specific notes for detailed evidence and
 remaining validation gaps.
 
-## Build, sign in and use cloud saves
+## Build and install
 
 These steps are for **Minecraft Dungeons II 1.1.3.0**, title ID
 `0100A7C01B792000`. Use your own game files, keys, Apple signing account and
@@ -123,8 +123,8 @@ binary edits, debugger patches or another person's login cache are needed.
 
 New builds from this fork **enable networking by default for this game**, on
 both iPhone and Mac. Open the installed app normally; no file editing, launch
-variable or extra switch is needed. Continue to the in-game account linking
-step below. Enabling networking does not authorize an account by itself.
+variable or extra switch is needed. Microsoft sign-in and cloud saves use the
+game's normal interface.
 
 If upgrading an old installation, an existing explicit `DM_NETWORK=0` override
 still keeps it offline. Remove that line from its `env.txt` (or change it to
@@ -138,64 +138,10 @@ on iPhone this is Files → On My iPhone → the game's folder, beside `save/` a
 `~/Library/Application Support/nxnative/0100A7C01B792000/env.txt`.
 This profile default does not enable networking for other games.
 
-### 4. Link your own Microsoft account
-
-1. Enter the game normally, then open the **in-game Settings** (not the
-   nxnative launcher settings) and choose the Microsoft account Link action.
-   First-time users initiate authorization here; merely opening the game does
-   not link an account.
-2. When the game displays a device code, open
-   [Microsoft's authorization page](https://www.microsoft.com/link) on another
-   device and enter the **currently displayed** code. Sign in with the Microsoft
-   account whose cloud saves you want, and complete the authorization yourself.
-   Never send a password, token or device code to the repository maintainers.
-3. Keep the game in the foreground while authorization completes. A second
-   device for the browser avoids interrupting the phone app during this step.
-   If the code expires, restart the link operation and use the new code.
-4. Wait for the game's account-linked success message and choose Continue.
-   Settings should then show your account nickname and linked state.
-
-After one successful login, subsequent full app restarts can restore the same
-account through the genuine Microsoft authorization cache. Older installations
-need one successful Settings login after upgrading to create the restore record.
-Authorization can still expire or be revoked; automatic restoration is not a
-replacement for Microsoft authorization.
-
-### 5. Download and upload your cloud character
-
-1. While signed in, open the game's cloud-save/character selection interface.
-   Use the same Microsoft account that owns the existing cloud character.
-   Check the **Offline Heroes** filter too: the tested cloud character belongs
-   there, so an empty Online Heroes list alone does not mean login failed.
-2. Select the intended cloud character and use the game's download/load action
-   if offered. Enable the game's **cloud saving for offline heroes** option
-   when using an offline hero. Labels may differ with the game's language.
-3. Enter the character, play, then use **Save and Return to Main Menu** in the
-   game's own menu. Leave the app online and in the foreground until its saving
-   activity finishes; do not force-close it during upload.
-4. To confirm synchronization, refresh/reopen the cloud list, or check the
-   character's progress on another installation signed in to the same account.
-   A cloud-list summary may remain unchanged even when the save payload updates.
-
-Back up local saves before downloading over an existing character. Cloud saves
-belong to your Microsoft account; rebuilding does not transfer someone else's
-characters. The signed iPhone test restored a level-100 character and completed
-an original game upload (HTTP 201, completion 200), including after two full
-app restarts. Other devices/accounts still need their own validation.
-
-### If something goes wrong
-
-- **Link is disabled/offline:** use a newly rebuilt app from this fork, check
-  for an old `DM_NETWORK=0` override, then fully close and reopen it.
-- **Code expired or login appears stuck:** restart the app, return to Settings
-  and start linking again. Use the latest code and keep the app foregrounded.
-- **No cloud characters:** confirm the account, offline/online character filter
-  and cloud-save option before replacing any local save.
-- **Still failing:** collect the app's `log.txt` (and `log.prev.txt` for the
-  preceding run), game version, device/iOS version and the visible error.
-  Review logs for personal information before sharing. Live Settings failures,
-  revoked-token recovery and Unlink still have validation gaps; see the
-  [game-specific notes](dm/games/0100A7C01B792000/README.md#reproducing-this-build).
+For build or runtime issues, include the app's `log.txt`, game version,
+device/iOS version and visible error when reporting a problem. See the
+[game-specific notes](dm/games/0100A7C01B792000/README.md) for technical details
+and remaining validation gaps.
 
 ## Upstream nxnative overview
 
