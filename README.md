@@ -56,28 +56,148 @@ this branch does not guarantee compatibility with the entire upstream gallery.
   is blocked by Xcode's missing MetalToolchain and unavailable component catalog;
   it is not a new regression pass or a cross-game gameplay guarantee.
 
-## Build this adaptation
+## Build, sign in and use cloud saves
 
-Follow the upstream prerequisites and build instructions below, and the
-[game-specific reproduction notes](dm/games/0100A7C01B792000/README.md#reproducing-this-build).
-Enable networking with `DM_NETWORK=1` in the app's persistent `env.txt` as
-explained in the game-specific notes. A launch-only environment override does not
-persist when the app is later opened from its icon.
+These steps are for **Minecraft Dungeons II 1.1.3.0**, title ID
+`0100A7C01B792000`. Use your own game files, keys, Apple signing account and
+Microsoft account. The repository contains no game data, account tokens or
+personal saves. The tested Microsoft-only path does not require supplying a
+Nintendo account. Multiplayer is not validated.
 
-From the repository root:
+### 1. Get this fork and prepare the game
+
+On an Apple Silicon Mac, install Xcode and Homebrew, then run:
 
 ```sh
-# Build a Mac app.
-python3 scripts/build_ipa_from_nsp.py "/path/to/game-folder" -k "/path/to/prod.keys" --platform mac-app
+git clone https://github.com/lucklyt/nxnative-minecraft-dungeons-ii.git
+cd nxnative-minecraft-dungeons-ii
+brew install xcodegen zstd spirv-cross glslang
+brew install --cask dotnet-sdk
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install lz4 capstone fonttools "backports.zstd; python_version < '3.14'"
+```
 
-# Prepare an iPhone Xcode project; use your own team and device for signing.
+If you already cloned this fork, run `git pull` before rebuilding. Put the base
+game, the **1.1.3.0 update** and any DLC you own in one folder outside the
+repository. Keep `prod.keys` outside the repository too. The packer selects the
+newest update in that folder: do not include a newer, unvalidated update.
+New versions may need updated build-specific patches even if packaging succeeds.
+
+### 2. Rebuild and install
+
+Run from the repository root, replacing the example paths with your own:
+
+```sh
+# Prepare the iPhone project, including this fork's game adaptations.
 python3 scripts/build_ipa_from_nsp.py "/path/to/game-folder" -k "/path/to/prod.keys" --keep-extracted --prepare-xcode
 ```
 
-Provide your own game files, keys and signing credentials. They are not included,
-and neither are account tokens or personal save data. Fixed-address adaptations
-are gated by module build IDs; new game versions require validation and may need
-updated profile patches. Shared host fixes and the build pipeline can be reused.
+Open the generated
+`/path/to/game-folder/0100A7C01B792000_build/xcode/DmIOS.xcodeproj` in Xcode:
+
+1. Sign in with your own Apple ID in Xcode Settings → Apple Accounts.
+2. Select the **DmIOS** target → **Signing & Capabilities**, enable automatic
+   signing, and select your own team. Use a unique bundle identifier if needed.
+3. Connect and unlock the iPhone, trust the Mac and enable Developer Mode when
+   requested. Select the actual iPhone as the run destination.
+4. Select the game's scheme and press **Run**. If iOS asks, trust/verify your
+   developer app in Settings → General → VPN & Device Management.
+
+See [Xcode installation details](docs/development.md#build-and-run-on-a-device-with-xcode)
+for signing and memory-capability requirements. Keep the same bundle identifier
+when updating, and back up your saves before replacing an existing installation.
+
+Alternatively, omit `--keep-extracted --prepare-xcode` to produce an unsigned IPA,
+then sign and install it with your own sideloading tool. For a Mac app instead:
+
+```sh
+python3 scripts/build_ipa_from_nsp.py "/path/to/game-folder" -k "/path/to/prod.keys" --platform mac-app
+```
+
+Repacking from this fork applies the supported profile automatically; no manual
+binary edits, debugger patches or another person's login cache are needed.
+
+### 3. Enable persistent networking
+
+Start the installed app once so its data folder exists, then fully close it.
+Create or edit the plain-text file **env.txt** in its Documents folder, keeping
+any existing settings and adding this line once:
+
+```text
+DM_NETWORK=1
+```
+
+- **iPhone:** in Files → On My iPhone → the game's folder, place `env.txt`
+  beside `save/` and `log.txt`. If creating a text file there is inconvenient,
+  create it on the Mac and copy it using Finder's device Files tab. Make sure
+  its name is `env.txt`, not `env.txt.txt`.
+- **Mac app:** use
+  `~/Library/Application Support/nxnative/0100A7C01B792000/env.txt`.
+
+Fully close and reopen the app from its icon. Networking is off by default.
+Setting a variable only for an Xcode/debug launch does not persist for later
+icon launches; the file above does. This switch enables the real network and
+Microsoft authentication paths; it does not sign you in by itself.
+
+### 4. Link your own Microsoft account
+
+1. Enter the game normally, then open the **in-game Settings** (not the
+   nxnative launcher settings) and choose the Microsoft account Link action.
+   First-time users initiate authorization here; merely opening the game does
+   not link an account.
+2. When the game displays a device code, open
+   [Microsoft's authorization page](https://www.microsoft.com/link) on another
+   device and enter the **currently displayed** code. Sign in with the Microsoft
+   account whose cloud saves you want, and complete the authorization yourself.
+   Never send a password, token or device code to the repository maintainers.
+3. Keep the game in the foreground while authorization completes. A second
+   device for the browser avoids interrupting the phone app during this step.
+   If the code expires, restart the link operation and use the new code.
+4. Wait for the game's account-linked success message and choose Continue.
+   Settings should then show your account nickname and linked state.
+
+After one successful login, subsequent full app restarts can restore the same
+account through the genuine Microsoft authorization cache. Older installations
+need one successful Settings login after upgrading to create the restore record.
+Authorization can still expire or be revoked; automatic restoration is not a
+replacement for Microsoft authorization.
+
+### 5. Download and upload your cloud character
+
+1. While signed in, open the game's cloud-save/character selection interface.
+   Use the same Microsoft account that owns the existing cloud character.
+   Check the **Offline Heroes** filter too: the tested cloud character belongs
+   there, so an empty Online Heroes list alone does not mean login failed.
+2. Select the intended cloud character and use the game's download/load action
+   if offered. Enable the game's **cloud saving for offline heroes** option
+   when using an offline hero. Labels may differ with the game's language.
+3. Enter the character, play, then use **Save and Return to Main Menu** in the
+   game's own menu. Leave the app online and in the foreground until its saving
+   activity finishes; do not force-close it during upload.
+4. To confirm synchronization, refresh/reopen the cloud list, or check the
+   character's progress on another installation signed in to the same account.
+   A cloud-list summary may remain unchanged even when the save payload updates.
+
+Back up local saves before downloading over an existing character. Cloud saves
+belong to your Microsoft account; rebuilding does not transfer someone else's
+characters. The signed iPhone test restored a level-100 character and completed
+an original game upload (HTTP 201, completion 200), including after two full
+app restarts. Other devices/accounts still need their own validation.
+
+### If something goes wrong
+
+- **Link is disabled/offline:** check that `DM_NETWORK=1` is in the installed
+  app's actual `env.txt`, then fully close and reopen it.
+- **Code expired or login appears stuck:** restart the app, return to Settings
+  and start linking again. Use the latest code and keep the app foregrounded.
+- **No cloud characters:** confirm the account, offline/online character filter
+  and cloud-save option before replacing any local save.
+- **Still failing:** collect the app's `log.txt` (and `log.prev.txt` for the
+  preceding run), game version, device/iOS version and the visible error.
+  Review logs for personal information before sharing. Live Settings failures,
+  revoked-token recovery and Unlink still have validation gaps; see the
+  [game-specific notes](dm/games/0100A7C01B792000/README.md#reproducing-this-build).
 
 ## Upstream nxnative overview
 
@@ -250,7 +370,7 @@ Prefer a graphical interface to the command line? **[NX2Apple](https://github.co
 **1. Get nxnative and its tools** (once, on a Mac with [Xcode](https://apps.apple.com/app/xcode/id497799835) and [Homebrew](https://brew.sh)):
 
 ```
-git clone https://github.com/seedds/nxnative.git && cd nxnative
+git clone https://github.com/lucklyt/nxnative-minecraft-dungeons-ii.git && cd nxnative-minecraft-dungeons-ii
 brew install xcodegen zstd spirv-cross glslang
 brew install --cask dotnet-sdk
 python3 -m pip install lz4 capstone fonttools "backports.zstd; python_version < '3.14'"
@@ -301,7 +421,7 @@ A connected game controller hides the touch controls and keeps every button.
 
 ## Known issues
 
-- No amiibo and no online features.
+- No amiibo. Upstream games generally have no online features; this fork's tested Minecraft Microsoft login/cloud-save path is described above. Multiplayer remains unverified.
 - Fire Emblem Engage: after switching away from the app and back, some sounds may stay silent until you restart it.
 - Fire Emblem: Three Houses: small square patches on the ground where decals land.
 - Super Mario Galaxy and Super Mario Galaxy 2: effects drawn as points or lines come out one pixel wide.

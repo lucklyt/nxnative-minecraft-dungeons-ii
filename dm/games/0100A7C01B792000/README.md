@@ -19,6 +19,12 @@ see the validation and open issues below.
 
 ## Reproducing this build
 
+For end-to-end player instructions, follow the root
+[build, sign-in and cloud-save guide](../../../README.md#build-sign-in-and-use-cloud-saves).
+It covers this fork, iPhone signing, persistent networking, your own Microsoft
+authorization and cloud-character download/upload. The notes below describe
+the implementation and validation.
+
 Use this repository revision and your own game files and `prod.keys`. Follow the
 root [build prerequisites](../../../README.md) first, then run from the repository
 root (replace the example paths):
