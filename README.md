@@ -6,55 +6,56 @@ focused on **Minecraft Dungeons II**, title ID `0100A7C01B792000`, game version
 is upstream project information; other games have not been revalidated against
 this branch's shared host changes.
 
-## Changes for Minecraft Dungeons II
+## Player features
 
-- A version-specific [game profile](dm/games/0100A7C01B792000/README.md), memory
-  sizing and build-ID-gated Unreal Engine allocator adaptations.
-- A 60 fps target using the engine's frame-rate and presentation settings,
-  plus display frame history to resolve the startup swapchain wait.
-- SSL initialization fixes and optional native sockets, DNS, verified TLS and
-  an HTTPS web applet, enabled by default for this game.
-- Signed, build-gated Microsoft-only login adapters that forward the real
-  account's audience-specific tokens through the original game callbacks.
-- A buffered TLS write fix for large cloud-save uploads, with transport,
-  TLS, SSL ABI, web and frame-history tests.
+- **60 FPS target** on iPhone and Apple Silicon Mac, enabled automatically for
+  the supported game version. Actual frame rate depends on the device and scene.
+- **Sign in with your own Microsoft account** from the game's Settings.
+- **Microsoft cloud-save synchronization:** access your account's cloud
+  characters and upload progress through the game's normal save flow, including
+  cloud saving for offline heroes when enabled in the game.
+- **Automatic sign-in restoration** after restarting the app, while Microsoft
+  authorization remains valid. Settings shows your account name and linked state.
+- **Networking enabled by default:** no configuration-file editing is needed
+  after installing a newly built app.
 
-These changes are committed as source and profile data. Repacking the supported
-game version with this repository applies them through the normal build pipeline.
-Shared host fixes also affect other game profiles where those paths are used;
-this branch does not guarantee compatibility with the entire upstream gallery.
+Start with the [build, sign-in and cloud-save guide](#build-sign-in-and-use-cloud-saves).
+Bring your own game files and account; no personal saves or credentials are
+included in this repository.
 
 ## Current support and limitations
 
-- Mac gameplay and iPhone menus/level-100 camp gameplay have been exercised. Menu runs measured
-  60 fps on both platforms; sustained iPhone combat performance and rendering
-  remain unverified. A 60 fps target does not guarantee sustained 60 fps.
-- A fresh standalone Mac process restored the genuine Microsoft account and
-  completed an original game cloud-save upload with HTTP 201 after camp gameplay
-  and normal exit. Login no longer needs the earlier LLDB token-provider prototype.
-  A passive debugger observed only the upload result after login had completed.
-- The signed iPhone build now completes Microsoft login from Settings and keeps
-  the real primary identity through the success dialog's Continue/title re-entry.
-  A standalone run entered the level-100 hero, moved/attacked and saved through
-  the original game UI. Passive observers attached afterward confirmed upload
-  HTTP 201 and final status 200, with no runtime code or credential adjustments.
-- Signed-device tests now pass two complete restarts with automatic genuine
-  Microsoft-account restoration. Settings displays the actual account nickname
-  and linked state. A small player-owned record stores only the real XUID;
-  the original XAL authorization cache and servers still authenticate the user.
-  Missing authorization is rejected and returns to a usable manual-login path.
-- Existing installs need one successful Settings login after upgrading to create
-  that restore record; fresh users authorize there explicitly. The first tested
-  phone is already migrated. Live Settings failure completion, revoked-token
-  recovery beyond the missing-cache test, Unlink and multiplayer need further
-  validation.
-- Nintendo platform credentials are not implemented. This exact game profile
-  selects genuine Microsoft authentication when `DM_NETWORK=1` is enabled.
-- The earlier local 15,826-shader static regression passed. Current host tests,
-  46 ARM64 login-adapter tests, 14 registry tests, four documentation tests and
-  Python lint (zero new findings) pass. The latest cross-game regression attempt
-  is blocked by Xcode's missing MetalToolchain and unavailable component catalog;
-  it is not a new regression pass or a cross-game gameplay guarantee.
+The supported version is **1.1.3.0**. Mac gameplay and iPhone level-100 camp
+play have been tested. Microsoft sign-in, cloud-character retrieval, progress
+upload and sign-in restoration after two full app restarts passed iPhone tests.
+Menu tests measured 60 FPS on both platforms; sustained iPhone combat performance
+and complete rendering remain unverified. A 60 FPS target does not guarantee
+60 FPS in every scene.
+
+First-time users link their account in the game's Settings. Existing users
+upgrading from an older build need one successful Settings login to enable
+automatic restoration. Expired/revoked authorization, some login failure paths
+and account unlinking need further testing. Multiplayer is unverified.
+The tested Microsoft cloud-save path does not require a Nintendo account.
+
+This is an experimental adaptation for this game. New game updates may require
+updated patches; other games in the inherited upstream gallery have not been
+revalidated against this fork.
+
+## Implementation and validation
+
+The [game-specific notes](dm/games/0100A7C01B792000/README.md) document the memory
+adaptations, frame pacing, Microsoft authentication and cloud-upload fixes.
+These changes are stored as source and game-profile data and apply automatically
+when repacking the supported version. Shared host fixes may also affect other
+games that use those paths.
+
+Mac and signed iPhone builds passed, along with host tests, 46 ARM64 login-adapter
+tests, 14 registry tests and four documentation tests. Original game uploads
+returned HTTP 201 and completion status 200. The latest cross-game regression
+attempt is blocked by missing locked Metal tools; it is not a cross-game
+compatibility guarantee. See the game-specific notes for detailed evidence and
+remaining validation gaps.
 
 ## Build, sign in and use cloud saves
 
