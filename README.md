@@ -26,21 +26,29 @@ this branch does not guarantee compatibility with the entire upstream gallery.
 
 ## Current support and limitations
 
-- Mac gameplay and iPhone startup/menus have been exercised. Menu runs measured
+- Mac gameplay and iPhone menus/level-100 camp gameplay have been exercised. Menu runs measured
   60 fps on both platforms; sustained iPhone combat performance and rendering
   remain unverified. A 60 fps target does not guarantee sustained 60 fps.
 - A fresh standalone Mac process restored the genuine Microsoft account and
   completed an original game cloud-save upload with HTTP 201 after camp gameplay
   and normal exit. Login no longer needs the earlier LLDB token-provider prototype.
   A passive debugger observed only the upload result after login had completed.
-- The iPhone build with the new login adapters succeeded, but installation was
-  interrupted by device disconnection. **iPhone login and cloud synchronization
-  remain unverified.** Fresh authorization and credential-expiry recovery still
-  need validation; multiplayer is unverified.
+- The signed iPhone build now completes Microsoft login from Settings and keeps
+  the real primary identity through the success dialog's Continue/title re-entry.
+  A standalone run entered the level-100 hero, moved/attacked and saved through
+  the original game UI. Passive observers attached afterward confirmed upload
+  HTTP 201 and final status 200, with no runtime code or credential adjustments.
+- Settings still displays the secondary-account "unlinked" label. Completely
+  restarting the app requires opening Settings and selecting Link again; genuine
+  cached authorization can be reused. Automatic cold restore, login-failure UI
+  completion, credential expiry/recovery and multiplayer remain open.
 - Nintendo platform credentials are not implemented. This exact game profile
   selects genuine Microsoft authentication when `DM_NETWORK=1` is enabled.
-- Host and graphics tests and the local 15,826-shader static regression passed;
-  this is not a gameplay regression test across all upstream games.
+- The earlier local 15,826-shader static regression passed. Current host tests,
+  29 ARM64 login-adapter tests, 14 registry tests, four documentation tests and
+  Python lint (zero new findings) pass. The latest cross-game regression attempt
+  is blocked by Xcode's missing MetalToolchain and unavailable component catalog;
+  it is not a new regression pass or a cross-game gameplay guarantee.
 
 ## Build this adaptation
 

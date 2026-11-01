@@ -48,7 +48,9 @@ class MicrosoftPrimary(unittest.TestCase):
         profile.microsoft_primary(ctx)
         self.uc.mem_map(self.base + 0x10000, 0x10000)
         self.uc.mem_write(self.base + 0x10000, b''.join(struct.pack('<I', w) for w in words))
-        for off in (0x42870e0, 0x427d7f0, 0x52a6470, 0x52a6c18, 0x52b7bdc, 0x52b7c5c, 0x52c0544, 0x7388790):
+        for off in (0x42870e0, 0x427d7f0, 0x52a6470, 0x52a6c18, 0x52b7bdc, 0x52b7c5c, 0x52c0544, 0x7388790,
+                    0x42870b0, 0x4280904, 0x52c5b70, 0x52c5b8c, 0x52c41ac,
+                    0x4768bb0, 0x52c59b4, 0x4766d78, 0x4db38c, 0x4769cf8, 0x52a7218, 0x52af060, 0x52af014, 0x52c0e3c, 0x4292670, 0x4767c34, 0x476794c):
             page = (self.base + off) & ~0xfff
             if page not in getattr(self, 'mapped', set()):
                 self.uc.mem_map(page, 0x1000)
@@ -164,6 +166,198 @@ class MicrosoftPrimary(unittest.TestCase):
     def test_offline_preserves_original_lazy_factory_path(self):
         self.run_selector(0)
         self.assertEqual(self.calls, [(0x52b7bdc, 0)])
+
+    def run_title_route(self, online, identity, signed_in):
+        owner = self.heap + 0x6500
+        self.uc.reg_write(reg.UC_ARM64_REG_X20, owner)
+        self.write32(owner + 0x100, 7)
+        self.handlers[self.base + 0x7388790] = lambda: self.return_value(online)
+        self.handlers[self.base + 0x42870b0] = lambda: self.return_value(identity)
+        def status():
+            self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X0), identity)
+            self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X1), 7)
+            self.return_value(signed_in)
+        self.handlers[self.base + 0x4280904] = status
+        for off in (0x52c5b70, 0x52c5b8c):
+            def finish(off=off):
+                self.calls.append(off)
+                self.uc.emu_stop()
+            self.handlers[self.base + off] = finish
+        self.run_provider(0x52c5a5c)
+
+    def test_unlinked_online_player_reaches_local_menu(self):
+        self.run_title_route(1, self.identity, 0)
+        self.assertEqual(self.calls, [0x52c5b8c])
+
+    def test_missing_identity_reaches_local_menu(self):
+        self.run_title_route(1, 0, 0)
+        self.assertEqual(self.calls, [0x52c5b8c])
+
+    def test_authenticated_player_retains_online_flow(self):
+        self.run_title_route(1, self.identity, 1)
+        self.assertEqual(self.calls, [0x52c5b70])
+
+    def test_offline_authenticated_player_reaches_local_menu(self):
+        self.run_title_route(0, self.identity, 1)
+        self.assertEqual(self.calls, [0x52c5b8c])
+
+    def run_settings_handoff(self, online=1, kind=0, signed_in=1, have_selector=True, gdk=True):
+        controller, owner = self.heap + 0x6200, self.heap + 0x6500
+        selector, flow, context = self.heap + 0x7000, self.heap + 0x7200, self.heap + 0x7400
+        self.uc.reg_write(reg.UC_ARM64_REG_X20, controller + 0x60)
+        self.write64(controller + 0x50, owner)
+        self.write32(owner + 0x100, 7)
+        self.uc.mem_write(self.context + 0x60, bytes([kind]))
+        self.write64(selector + 0x30, flow)
+        self.write64(flow, self.base + (0x92fbba8 if gdk else 0x92fe520))
+        saved = {r: self.uc.reg_read(r) for r in (reg.UC_ARM64_REG_X19, reg.UC_ARM64_REG_X20, reg.UC_ARM64_REG_X21)}
+        actions = []
+        self.handlers[self.base + 0x7388790] = lambda: self.return_value(online)
+        self.handlers[self.base + 0x42870b0] = lambda: self.return_value(self.context)
+        def handler(name, expected, result):
+            def run():
+                for r, value in expected.items():
+                    self.assertEqual(self.uc.reg_read(r), value)
+                actions.append(name)
+                self.return_value(result)
+            return run
+        self.handlers[self.base + 0x4280904] = handler('status', {reg.UC_ARM64_REG_X0: self.context, reg.UC_ARM64_REG_X1: 7}, signed_in)
+        self.handlers[self.base + 0x52c41ac] = handler('selector', {reg.UC_ARM64_REG_X0: owner}, selector if have_selector else 0)
+        self.handlers[self.base + 0x4768bb0] = handler('cancel', {reg.UC_ARM64_REG_X0: controller}, 0)
+        self.handlers[self.base + 0x52c59b4] = handler('select', {reg.UC_ARM64_REG_X0: selector, reg.UC_ARM64_REG_X1: 0}, 0)
+        self.handlers[self.base + 0x4292670] = handler('context', {reg.UC_ARM64_REG_X0: owner}, context)
+        self.handlers[self.base + 0x52c0e3c] = handler('start', {reg.UC_ARM64_REG_X0: flow, reg.UC_ARM64_REG_X1: context}, 0)
+        for name, off in [('done', 0x4767c34), ('fallback', 0x476794c)]:
+            def finish(name=name):
+                actions.append(name)
+                if name == 'fallback':
+                    self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X0), self.context)
+                self.uc.emu_stop()
+            self.handlers[self.base + off] = finish
+        self.run_provider(0x4767948)
+        for r, value in saved.items():
+            self.assertEqual(self.uc.reg_read(r), value)
+        return actions
+
+    def test_settings_authenticated_microsoft_user_starts_real_primary(self):
+        self.assertEqual(self.run_settings_handoff(), ['status', 'selector', 'select', 'context', 'start', 'done'])
+
+    def test_settings_missing_auth_preserves_original_failure(self):
+        self.assertEqual(self.run_settings_handoff(signed_in=0), ['status', 'fallback'])
+
+    def test_settings_other_native_provider_is_untouched(self):
+        self.assertEqual(self.run_settings_handoff(kind=3), ['fallback'])
+
+    def test_settings_offline_preserves_original_path(self):
+        self.assertEqual(self.run_settings_handoff(online=0), ['fallback'])
+
+    def test_settings_missing_selector_does_not_cancel_original_operation(self):
+        self.assertEqual(self.run_settings_handoff(have_selector=False), ['status', 'selector', 'fallback'])
+
+    def test_settings_does_not_start_an_unexpected_selected_flow(self):
+        self.assertEqual(self.run_settings_handoff(gdk=False), ['status', 'selector', 'select', 'done'])
+
+    def run_settings_complete(self, online=1, kind=0, pending=1, matching=True, have_subsystem=True):
+        controller, owner = self.heap + 0x6200, self.heap + 0x6500
+        state, service = self.heap + 0x7000, self.heap + 0x7200
+        subsystem = self.heap + 0x7400
+        self.uc.reg_write(reg.UC_ARM64_REG_X20, service)
+        self.uc.reg_write(reg.UC_ARM64_REG_X19, state)
+        self.write64(service + 0x38, owner)
+        self.write64(subsystem + 0x30, controller)
+        self.write64(controller + 0x50, owner if matching else owner + 0x200)
+        self.uc.mem_write(controller + 0xc8, bytes([pending]))
+        self.uc.mem_write(self.context + 0x60, bytes([kind]))
+        self.write64(state + 0x28, 0x11223344)
+        saved = {r: self.uc.reg_read(r) for r in (reg.UC_ARM64_REG_X1, reg.UC_ARM64_REG_X8,
+                  reg.UC_ARM64_REG_X19, reg.UC_ARM64_REG_X20, reg.UC_ARM64_REG_X21)}
+        actions = []
+        self.handlers[self.base + 0x7388790] = lambda: self.return_value(online)
+        self.handlers[self.base + 0x42870b0] = lambda: self.return_value(self.context)
+        def getter():
+            self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X0), owner)
+            self.return_value(subsystem if have_subsystem else 0)
+        self.handlers[self.base + 0x4766d78] = getter
+        def weak():
+            source = self.uc.reg_read(reg.UC_ARM64_REG_X1)
+            target = self.uc.reg_read(reg.UC_ARM64_REG_X0)
+            self.assertEqual(struct.unpack('<Q', self.uc.mem_read(source, 8))[0], controller)
+            self.write64(target, 0x12345678)
+            actions.append('weak')
+            self.return_value(0)
+        def success():
+            weak_ptr = self.uc.reg_read(reg.UC_ARM64_REG_X0)
+            self.assertEqual(struct.unpack('<Q', self.uc.mem_read(weak_ptr, 8))[0], 0x12345678)
+            actions.append('complete')
+            self.return_value(0)
+        self.handlers[self.base + 0x4db38c] = weak
+        self.handlers[self.base + 0x4769cf8] = success
+        self.handlers[self.base + 0x52a7218] = self.uc.emu_stop
+        self.run_provider(0x52a7214)
+        self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X0), 0x11223344)
+        for r, value in saved.items():
+            self.assertEqual(self.uc.reg_read(r), value)
+        return actions
+
+    def test_real_server_success_completes_matching_settings_promise(self):
+        self.assertEqual(self.run_settings_complete(), ['weak', 'complete'])
+
+    def test_cancelled_settings_is_not_completed(self):
+        self.assertEqual(self.run_settings_complete(pending=0), [])
+
+    def test_another_players_settings_is_not_completed(self):
+        self.assertEqual(self.run_settings_complete(matching=False), [])
+
+    def test_server_success_does_not_touch_other_platform_linking(self):
+        self.assertEqual(self.run_settings_complete(kind=3), [])
+
+    def test_server_success_without_settings_subsystem_is_safe(self):
+        self.assertEqual(self.run_settings_complete(have_subsystem=False), [])
+
+    def test_offline_path_does_not_complete_settings(self):
+        self.assertEqual(self.run_settings_complete(online=0), [])
+
+    def run_identity_lifetime(self, online=1, kind=0, signed_in=1):
+        service, owner = self.heap + 0x7000, self.heap + 0x7200
+        self.uc.reg_write(reg.UC_ARM64_REG_X20, service)
+        self.write64(service + 0x38, owner)
+        self.write64(service + 0x50, self.heap + 0x7400)
+        self.write32(owner + 0x100, 7)
+        self.uc.mem_write(self.context + 0x60, bytes([kind]))
+        saved = {r: self.uc.reg_read(r) for r in (reg.UC_ARM64_REG_X1, reg.UC_ARM64_REG_X8,
+                  reg.UC_ARM64_REG_X19, reg.UC_ARM64_REG_X20, reg.UC_ARM64_REG_X21)}
+        self.handlers[self.base + 0x7388790] = lambda: self.return_value(online)
+        self.handlers[self.base + 0x42870b0] = lambda: self.return_value(self.context)
+        def status():
+            self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X0), self.context)
+            self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X1), 7)
+            self.return_value(signed_in)
+        self.handlers[self.base + 0x4280904] = status
+        actions = []
+        for off, label in [(0x52af060, 'retain-primary'), (0x52af014, 'original-logout')]:
+            def finish(label=label):
+                actions.append(label)
+                if label == 'original-logout':
+                    self.assertEqual(self.uc.reg_read(reg.UC_ARM64_REG_X0), self.heap + 0x7400)
+                self.uc.emu_stop()
+            self.handlers[self.base + off] = finish
+        self.run_provider(0x52af010)
+        for r, value in saved.items():
+            self.assertEqual(self.uc.reg_read(r), value)
+        self.assertNotIn(0x4767bd0, self.sites)  # explicit user unlink is untouched
+        return actions
+
+    def test_primary_microsoft_user_survives_session_logout(self):
+        self.assertEqual(self.run_identity_lifetime(), ['retain-primary'])
+
+    def test_other_platform_identity_keeps_original_logout(self):
+        self.assertEqual(self.run_identity_lifetime(kind=3), ['original-logout'])
+
+    def test_unsigned_identity_keeps_original_logout(self):
+        self.assertEqual(self.run_identity_lifetime(signed_in=0), ['original-logout'])
+
+    def test_offline_session_keeps_original_logout(self):
+        self.assertEqual(self.run_identity_lifetime(online=0), ['original-logout'])
 
 
 if __name__ == '__main__':

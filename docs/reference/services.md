@@ -677,3 +677,16 @@ Most service calls can be found before they crash, before the first boot or the 
 - **Cause:** code that calls fixed module addresses. d2r-mobile's 3D render scale read a renderer pointer at `main+0x31e0848` and called `main+0x8582f0`; in Mario v0 that is the middle of a static initializer and only did nothing because the pointer happened to read 0.
 - **Fix:** such code checks `module_t.build_id` now (written into `fixups.tsv` by the rewriter) and stays off on other builds.
 - **Found on:** [Super Mario Bros. Wonder](../../dm/games/010015100B514000/README.md) (v0, code inherited from d2r-mobile).
+
+## Application error applet diagnostics
+
+- **Symptom:** a game returns to its menu without a visible error, while the host
+  prints only `ApplicationErrorArg`.
+- **Cause:** the application error applet is logged rather than displayed, and
+  the original logger discarded the supplied application error number.
+- **Fix:** log the numeric application code from the SDK argument after its
+  eight-byte language code. Neither message is logged: application messages may
+  contain account data. This improves diagnosis without changing error handling
+  or reporting authentication success.
+- **Found on:** [Minecraft Dungeons II](../../dm/games/0100A7C01B792000/README.md#network-validation)
+  (the Settings linking failure was application code 29).

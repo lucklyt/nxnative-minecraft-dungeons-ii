@@ -112,7 +112,12 @@ HLE_FORCE("_ZN2nn3err9ShowErrorERKNS0_18ErrorResultVariantE", "error display app
 HLE_FORCE("_ZN2nn3err40ShowUnacceptableAddOnContentVersionErrorEv", "add-on content version mismatch error applet; the host only logs it", void, h_err_AocVer, void) { LOG("game asks to show an error: add-on content version mismatch"); }
 HLE_FORCE("_ZN2nn3err39ShowUnacceptableApplicationVersionErrorEv", "game version mismatch error applet; the host only logs it", void, h_err_AppVer, void) { LOG("game asks to show an error: game version mismatch"); }
 // Pokémon Legends: Z-A (SDK 19): the application's own error screen (an error code number and two messages in the argument) goes through the error applet as well
-HLE_FORCE("_ZN2nn3err20ShowApplicationErrorERKNS0_19ApplicationErrorArgE", "application error applet; the host only logs it", void, h_err_ShowApp, const void *arg) { (void)arg; LOG("game asks to show an application error (ApplicationErrorArg)"); }
+HLE_FORCE("_ZN2nn3err20ShowApplicationErrorERKNS0_19ApplicationErrorArgE", "application error applet; the host only logs it", void, h_err_ShowApp, const void *arg) {
+    // ApplicationErrorArg stores its numeric application code after the 8-byte
+    // language code. Do not log either message: they can contain account data.
+    uint32_t code = 0; if (arg) memcpy(&code, (const char *)arg + 8, sizeof code);
+    LOG("game asks to show an application error (ApplicationErrorArg code=%u)", code);
+}
 // Pokémon Sword (SDK 7.3.2): the error applet's network service form, after a failed online call
 HLE_FORCE("_ZN2nn3err23ShowNetworkServiceErrorENS0_9ErrorCodeE", "network service error applet; the host only logs it", void, h_err_ShowNet, uint64_t code) { LOG("game asks to show a network service error: %04u-%04u", (unsigned)(code & 0xffffffff), (unsigned)(code >> 32)); }
 

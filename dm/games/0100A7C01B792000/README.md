@@ -2,6 +2,8 @@
 
 Minecraft Dungeons II, Unreal Engine 5.6.1, Nintendo SDK 20.5.15, update 1.1.3.0.
 
+Found on this game: [application error applet diagnostics](../../../docs/reference/services.md#application-error-applet-diagnostics).
+
 Status: experimental port. The shared memory, SSL initialization and frame-history
 fixes reach the game on Mac and the menus on iPhone 16 Pro. Menu runs measured
 60 fps on both platforms; sustained combat performance and complete iPhone
@@ -10,8 +12,9 @@ and completed two original cloud-save uploads after the buffered TLS write fix.
 The current profile now supplies signed, build-gated Microsoft token-provider
 adapters. A fresh standalone Mac process restored the genuine Microsoft account
 and its original save upload returned HTTP 201 after gameplay and normal exit.
-The iPhone build succeeded, but installation was blocked by device disconnection;
-iPhone login and synchronization remain unverified. See the validation and open
+The corrected iPhone build reaches the local character menu and visibly opens
+Microsoft authorization from Settings; completed iPhone login and synchronization
+remain unverified. See the validation and open
 issues below.
 
 ## Reproducing this build
@@ -280,26 +283,97 @@ Microsoft account map, check sparse allocation bits, object vtables and local
 user index, and forward the existing PlayFab (`+0x98`) or Minecraft (`+0x88`)
 FString to the original callback. Missing users or empty tokens use the original
 provider and its error path. No authentication results or credentials are forged.
-The original offline primary-factory selection is preserved when networking is
-disabled.
+The title-entry route now checks real native Microsoft login status for the
+actual local-player index as well as network availability. An unlinked player
+uses the game's original local flow and can open Settings to link explicitly.
+This corrects the earlier unconditional online route, which requested a real
+device code behind the title's Signing In overlay, without displaying the
+Settings authorization dialog. Code generation alone did not establish that
+the user could see or complete authorization. On iPhone 16 Pro, the corrected
+signed build reached the local character menu with no interactive XAL request
+at title entry; opening Settings and selecting Link visibly displayed the
+official Microsoft URL and fresh user code. Completion remains pending.
 
 A fresh Mac launch, with no login debugger attached, restored the cached account
 and displayed it as linked in Settings. With the existing level-100 hero, cloud
 saves enabled, camp movement and normal Save and Return to Main Menu, the
 game's original upload returned HTTP 201 and its completion reported status 200.
 A passive debugger was attached only after login to observe that original upload;
-it supplied no tokens and changed no response. Nine synthetic ARM64 execution
+it supplied no tokens and changed no response. Twenty-nine synthetic ARM64 execution
 tests cover audience selection, missing credentials, local-user separation,
-sparse holes and online/offline factory selection (`test_minecraft_primary.py`,
+sparse holes, online/offline factory selection, unlinked/linked title routing and
+Settings handoff guards/ABI preservation (`test_minecraft_primary.py`,
 optional `unicorn` package; no game files, credentials or network required).
 
 **Open:** verify fresh authorization, credential expiry/recovery, cloud character
 selection and synchronization on iPhone, and multiplayer. The signed iPhone build
-with these adapters succeeded, but installation failed when the connected device
-became unavailable. Nintendo proof is still absent; the network-enabled profile
+with these adapters was installed. Passive signed diagnostics confirmed XAL
+start success and server generation of an eight-character user code, while the
+user still saw Signing In; no successful first iPhone authorization was observed.
+Optional `DM_AUTH_TRACE=1` logs stage and error metadata, never credential contents
+or user codes. Nintendo proof is still absent; the network-enabled profile
 uses genuine Microsoft credentials instead.
 Offline-hero cloud synchronization is now enabled for the user-requested level-100
 upload test. Preserve the separate level-one local test hero and existing cloud data.
+
+**Current iPhone login (2026-11-01):** the signed build completes genuine
+Microsoft-primary server authentication from Settings, displays the original
+Account Linked Successfully dialog, and preserves the primary user through
+Continue and title re-entry. A standalone iPhone 16 Pro run, with no debugger
+attached, displayed the real Microsoft account and the level-100, power-150
+hero. Its log recorded both audience providers, original Minecraft responses
+and delivery of one cloud character, including a second login after Continue.
+No credentials, server responses or authentication results are manufactured.
+
+The original Settings failure was isolated with passive observations:
+`XalAddUserWithUiResult` returned HRESULT 0, then the native-token request called
+the existing false-return function at `main+0x10`. No native-token callback
+arrived; the game reported application error 29. Backgrounding is therefore
+not an established explanation for that attempt. Switch cross-platform linking
+has native backends for provider kinds 3/4/6; Microsoft-primary uses kind 0 and
+the shipped GDK flow instead.
+
+The exact-build handoff retains the real RemoteConnect UI, account-ID checks
+and pending completion while starting the actual player's original GDK primary.
+Networking, kind 0 and actual identity login status are required. Other kinds
+and missing identities/selectors retain the original path; an unexpected
+selected flow is never started as GDK. The adapter at `main+0x52a7214` completes
+the original weak-object UI promise only after Minecraft response validation,
+account lookup and session/profile initialization, with matching player ownership
+and a still-live operation. XAL completion or token dispatch alone cannot report
+that game-login success. Cancelling the pending promise early was tested and
+rejected: backend login worked, but it stranded the authorization modal.
+
+Switch's session logout also signs out the secondary Microsoft identity. Here
+that identity is the actual primary platform user. The `main+0x52af010` adapter
+keeps it across game-session/title transitions only when online, kind 0 and
+actually signed in, while continuing original game-session teardown. Other
+kinds, offline and signed-out users retain original identity logout. Explicit
+Settings unlink at `main+0x4767bd0` remains unchanged. A bounded phone experiment
+first verified this lifetime adjustment; the final signed build then passed
+Settings, Continue and title re-entry without any runtime flow adjustment.
+
+The phone experiment also moved, jumped and performed a melee attack with the
+level-100 hero, then selected the original Save and Return to Main Menu. Passive
+observers attached after login/gameplay recorded transport success and HTTP 201
+at `main+0x41d16f4`, then final status 200 at `main+0x41d01b0`. No external uploader
+or changed response was used. The final signed build then repeated login and level-100 gameplay without a
+debugger and repeated Save and Return to Main Menu with only passive upload
+observers attached afterward: HTTP 201 and final status 200 again. No runtime
+code, flow or credential adjustment was used in that final run.
+
+Twenty-nine synthetic ARM64 tests cover the adapters' guarded paths, matching
+player ownership, cancellation and ABI preservation; fourteen registry tests
+and four documentation tests pass. Host build/tests pass, and Python lint has
+zero new findings. The current quick cross-game regression is blocked by the
+updated Xcode installation's missing MetalToolchain; its official component
+download failed to retrieve a matching catalog. This is not a regression pass,
+and no shader-chain lock was changed to conceal it.
+
+**Open:** the Settings linked-label still uses the secondary association cache;
+cold launch does not automatically restore the game session (open Settings and
+Link again); primary-login failure completion and credential expiry/recovery
+need further validation. Multiplayer is not established by cloud-save success.
 
 ## Startup wait after the movies
 
