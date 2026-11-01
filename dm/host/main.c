@@ -61,6 +61,8 @@ static unsigned g_race_n, g_race_want;
 static void *keyrace_thread(void *unused);
 static void host_preload(int argc, char **argv) {
     g_t0_ns = proc_start_mono_ns();
+    // Profile defaults apply on Mac and iOS; explicit environment/file settings win.
+    if (DM_GAME_NETWORK_DEFAULT) setenv("DM_NETWORK", "1", 0);
     flags_init();
     if (argc < 2) die("usage: dmhost <dir> [mod...] [-- game arguments...]");
     // Time zone: the game converts absolute time to local time along two paths, both ending in the host libc -- nn::time::ToCalendarTime (hle_time.c, localtime_r) and the guest libc's

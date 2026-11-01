@@ -13,7 +13,7 @@ this branch's shared host changes.
 - A 60 fps target using the engine's frame-rate and presentation settings,
   plus display frame history to resolve the startup swapchain wait.
 - SSL initialization fixes and optional native sockets, DNS, verified TLS and
-  an HTTPS web applet, enabled explicitly with `DM_NETWORK=1`.
+  an HTTPS web applet, enabled by default for this game.
 - Signed, build-gated Microsoft-only login adapters that forward the real
   account's audience-specific tokens through the original game callbacks.
 - A buffered TLS write fix for large cloud-save uploads, with transport,
@@ -118,27 +118,24 @@ python3 scripts/build_ipa_from_nsp.py "/path/to/game-folder" -k "/path/to/prod.k
 Repacking from this fork applies the supported profile automatically; no manual
 binary edits, debugger patches or another person's login cache are needed.
 
-### 3. Enable persistent networking
+### 3. Start with networking already enabled
 
-Start the installed app once so its data folder exists, then fully close it.
-Create or edit the plain-text file **env.txt** in its Documents folder, keeping
-any existing settings and adding this line once:
+New builds from this fork **enable networking by default for this game**, on
+both iPhone and Mac. Open the installed app normally; no file editing, launch
+variable or extra switch is needed. Continue to the in-game account linking
+step below. Enabling networking does not authorize an account by itself.
 
-```text
-DM_NETWORK=1
-```
+If upgrading an old installation, an existing explicit `DM_NETWORK=0` override
+still keeps it offline. Remove that line from its `env.txt` (or change it to
+`DM_NETWORK=1`) and fully restart the app. Old binaries must be rebuilt and
+reinstalled to gain the new default; updating the README alone does not change
+an installed app.
 
-- **iPhone:** in Files → On My iPhone → the game's folder, place `env.txt`
-  beside `save/` and `log.txt`. If creating a text file there is inconvenient,
-  create it on the Mac and copy it using Finder's device Files tab. Make sure
-  its name is `env.txt`, not `env.txt.txt`.
-- **Mac app:** use
-  `~/Library/Application Support/nxnative/0100A7C01B792000/env.txt`.
-
-Fully close and reopen the app from its icon. Networking is off by default.
-Setting a variable only for an Xcode/debug launch does not persist for later
-icon launches; the file above does. This switch enables the real network and
-Microsoft authentication paths; it does not sign you in by itself.
+For optional offline use, set `DM_NETWORK=0` in the app's `env.txt` and restart:
+on iPhone this is Files → On My iPhone → the game's folder, beside `save/` and
+`log.txt`; on Mac it is
+`~/Library/Application Support/nxnative/0100A7C01B792000/env.txt`.
+This profile default does not enable networking for other games.
 
 ### 4. Link your own Microsoft account
 
@@ -187,8 +184,8 @@ app restarts. Other devices/accounts still need their own validation.
 
 ### If something goes wrong
 
-- **Link is disabled/offline:** check that `DM_NETWORK=1` is in the installed
-  app's actual `env.txt`, then fully close and reopen it.
+- **Link is disabled/offline:** use a newly rebuilt app from this fork, check
+  for an old `DM_NETWORK=0` override, then fully close and reopen it.
 - **Code expired or login appears stuck:** restart the app, return to Settings
   and start linking again. Use the latest code and keep the app foregrounded.
 - **No cloud characters:** confirm the account, offline/online character filter

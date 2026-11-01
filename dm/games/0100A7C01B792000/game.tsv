@@ -32,6 +32,10 @@ app_pool	0xCD500000
 # the NPDM declares 20 MB of system resource
 sys_resource	0x1400000
 
+# Enable genuine Microsoft login/cloud transport without a user-created env file.
+# Explicit DM_NETWORK=0 still selects offline mode.
+network_default	1
+
 # ---- Frame rate ----
 # The build-gated Unreal cvar rows raise t.MaxFPS to 60 and rhi.SyncInterval to 1.
 fps_target	60

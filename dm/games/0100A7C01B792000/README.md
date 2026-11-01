@@ -21,7 +21,7 @@ see the validation and open issues below.
 
 For end-to-end player instructions, follow the root
 [build, sign-in and cloud-save guide](../../../README.md#build-sign-in-and-use-cloud-saves).
-It covers this fork, iPhone signing, persistent networking, your own Microsoft
+It covers this fork, iPhone signing, default networking, your own Microsoft
 authorization and cloud-character download/upload. The notes below describe
 the implementation and validation.
 
@@ -39,13 +39,23 @@ select your own development team and device in Xcode. No game files, keys,
 signing identities or account credentials are included in the repository.
 The profile supplies the memory settings and requests 60 fps automatically.
 
-Networking is opt-in: add `DM_NETWORK=1` to the installed iPhone app's
-`Documents/env.txt`, or the Mac app's
-`~/Library/Application Support/nxnative/0100A7C01B792000/env.txt`, one setting per
-line, and restart. This enables native transport and the HTTPS web applet;
-for this exact game build it also selects the genuine Microsoft-only login flow
-and audience-token adapters. It does not supply Nintendo credentials. Default
-builds remain offline. Multiplayer is unverified.
+Networking is enabled by default through this profile's `network_default 1`
+setting, applied by host startup on both iPhone and Mac. Newly rebuilt apps need
+no `env.txt` editing. An explicit `DM_NETWORK=0` still opts out; existing file
+settings take precedence. The iPhone override file is `Documents/env.txt`; the
+Mac app uses `~/Library/Application Support/nxnative/0100A7C01B792000/env.txt`.
+Restart after changing an override. Other game profiles remain offline by
+default. This enables native transport and the HTTPS web applet and, for the
+supported build, the genuine Microsoft-only login flow and audience-token
+adapters. First authorization still starts explicitly in in-game Settings.
+No Nintendo credentials are supplied. Multiplayer is unverified.
+
+Default-network validation: all generated profile headers were checked; only
+this game enables the default. The Mac host build and host tests pass. The
+cross-game regression attempt against `2db0162` is blocked by the previously
+missing locked macOS/iPhoneOS Metal compiler (report `20261102-001113-chain`),
+not recorded as a regression pass. This default change has not been reinstalled
+or separately exercised on the phone.
 
 The tested game version is **1.1.3.0**. Fixed-address patches and host hooks are
 gated by module build IDs and checked against the expected instructions. For a
@@ -123,7 +133,7 @@ The Mac boot no longer reaches that abort. See the general
 
 ## Network validation
 
-Current development mode `DM_NETWORK=1` enables genuine host sockets, DNS,
+The effective `DM_NETWORK=1` setting (now the profile default) enables genuine host sockets, DNS,
 verified TLS 1.2 and a native HTTPS web applet. The game still runs its own
 HTTP/Xbox libraries and handles its own login responses. No Nintendo account
 credentials, console device certificates or Microsoft tokens are fabricated.
@@ -179,7 +189,7 @@ authorization was subsequently tested as described below.
 The two exact-build UI eligibility calls at `main+0x535fe90` and
 `main+0x5633720` now target the existing NIFM availability import at
 `main+0x7388790`. This is a platform-limit adaptation for local host users with
-no Nintendo NSAID. Default offline mode keeps the action disabled. The unlinked
+no Nintendo NSAID. Explicit offline mode (`DM_NETWORK=0`) keeps the action disabled. The unlinked
 account and controller checks and actual XAL authentication are preserved.
 The isolated Mac test reached `XalAddUserWithUiAsync` and observed synchronous
 HRESULT zero, then displayed the real Microsoft RemoteConnect dialog. Its
