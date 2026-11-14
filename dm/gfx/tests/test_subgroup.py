@@ -4,11 +4,14 @@ from pathlib import Path
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 import unittest
 
 
 source = Path(__file__).resolve().parents[1] / 'tools/dmsh_build.py'
+sys.path.insert(0, str(source.parent))
+from dmsh_chain import SPIRV_CROSS  # noqa: E402
 tree = ast.parse(source.read_text())
 nodes = [n for n in tree.body if
          isinstance(n, ast.FunctionDef) and n.name in ('spv_single_lane', '_ep_drop') or
@@ -54,7 +57,35 @@ OpFunctionEnd
 '''
 
 
-@unittest.skipUnless(shutil.which('spirv-as') and shutil.which('spirv-val') and shutil.which('spirv-cross'), 'requires SPIR-V tools')
+# A domain shader that reads only the lane ID, in a module with no bool and no uvec4 (PRAGMATA's 859225c91a5fe2b2): the rewrite declares the types its constants need
+LANE_ONLY = '''OpCapability Tessellation
+OpCapability GroupNonUniform
+OpMemoryModel Logical GLSL450
+OpEntryPoint TessellationEvaluation %main "main" %lane %pos
+OpExecutionMode %main Triangles
+OpDecorate %lane BuiltIn SubgroupLocalInvocationId
+OpDecorate %pos BuiltIn Position
+%void = OpTypeVoid
+%fn = OpTypeFunction %void
+%uint = OpTypeInt 32 0
+%float = OpTypeFloat 32
+%v4 = OpTypeVector %float 4
+%in_uint = OpTypePointer Input %uint
+%out_v4 = OpTypePointer Output %v4
+%lane = OpVariable %in_uint Input
+%pos = OpVariable %out_v4 Output
+%main = OpFunction %void None %fn
+%entry = OpLabel
+%id = OpLoad %uint %lane
+%f = OpConvertUToF %float %id
+%p = OpCompositeConstruct %v4 %f %f %f %f
+OpStore %pos %p
+OpReturn
+OpFunctionEnd
+'''
+
+
+@unittest.skipUnless(shutil.which('spirv-as') and shutil.which('spirv-val') and shutil.which(SPIRV_CROSS), 'requires SPIR-V tools')
 class SubgroupTests(unittest.TestCase):
     def test_mask_component_pointer_becomes_valid_constant_extraction(self):
         for access in ('OpAccessChain', 'OpInBoundsAccessChain'):
@@ -66,10 +97,23 @@ class SubgroupTests(unittest.TestCase):
                 self.assertTrue(scope['spv_single_lane'](spv))
                 result = subprocess.run(['spirv-val', '--target-env', 'spv1.3', str(spv)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                result = subprocess.run(['spirv-cross', '--msl', str(spv)], capture_output=True, text=True)
+                result = subprocess.run([SPIRV_CROSS, '--msl', str(spv)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn('simd_', result.stdout)
                 self.assertFalse(scope['spv_single_lane'](spv))
+
+
+    def test_a_module_without_the_constant_types(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); src, spv = root / 'lane.spvasm', root / 'lane.spv'
+            src.write_text(LANE_ONLY)
+            subprocess.run(['spirv-as', '--target-env', 'spv1.3', str(src), '-o', str(spv)], check=True, capture_output=True)
+            self.assertNotEqual(subprocess.run([SPIRV_CROSS, '--msl', str(spv)], capture_output=True, text=True).returncode, 0)   # SPIRV-Cross refuses the builtin in this stage
+            self.assertTrue(scope['spv_single_lane'](spv))
+            result = subprocess.run(['spirv-val', '--target-env', 'spv1.3', str(spv)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run([SPIRV_CROSS, '--msl', str(spv)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == '__main__':

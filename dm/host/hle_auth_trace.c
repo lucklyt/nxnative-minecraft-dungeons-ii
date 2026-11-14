@@ -9,10 +9,10 @@ static int auth_read(uint64_t a, void *out, size_t n) {
     return a >= 0x1000 && vm_read_overwrite(mach_task_self(), (vm_address_t)a, n,
            (vm_address_t)out, &got) == KERN_SUCCESS && got == n;
 }
-#define AUTH_STAGE(fn, text) static void fn(const uint64_t *regs) { \
+#define AUTH_STAGE(fn, text) static void fn(uint64_t *regs, int param __attribute__((unused))) { \
     (void)regs; static _Atomic unsigned count; \
     if (atomic_fetch_add(&count, 1) < 16) LOG("auth: " text); }
-static void auth_primary(const uint64_t *regs) {
+static void auth_primary(uint64_t *regs, int param __attribute__((unused))) {
     unsigned char mode = 255;
     if (auth_read(regs[1] + 0x188, &mode, sizeof mode))
         LOG("auth: Microsoft primary flow started (context mode=%u)", (unsigned)mode);
@@ -23,16 +23,16 @@ AUTH_STAGE(auth_minecraft, "Minecraft audience provider requested")
 AUTH_STAGE(auth_game_response, "original Minecraft login response callback")
 AUTH_STAGE(auth_cloud_request, "original cloud-list request")
 #undef AUTH_STAGE
-static void auth_cloud_response(const uint64_t *regs) {
+static void auth_cloud_response(uint64_t *regs, int param __attribute__((unused))) {
     uint32_t count = 0;
     if (auth_read(regs[19] + 8, &count, sizeof count) && count <= 4096)
         LOG("auth: original cloud-list character delivery (characters=%u)", count);
     else LOG("auth: original cloud-list character delivery (count unavailable)");
 }
-static void auth_xal_begin(const uint64_t *regs) { LOG("auth: XAL add-user start HRESULT=%#x", (unsigned)regs[0]); }
-static void auth_xal_result(const uint64_t *regs) { LOG("auth: XAL add-user result HRESULT=%#x", (unsigned)regs[0]); }
-static void auth_failure(const uint64_t *regs) { LOG("auth: original login failure enum=%u", (unsigned)regs[24]); }
-static void auth_device_code(const uint64_t *regs) {
+static void auth_xal_begin(uint64_t *regs, int param __attribute__((unused))) { LOG("auth: XAL add-user start HRESULT=%#x", (unsigned)regs[0]); }
+static void auth_xal_result(uint64_t *regs, int param __attribute__((unused))) { LOG("auth: XAL add-user result HRESULT=%#x", (unsigned)regs[0]); }
+static void auth_failure(uint64_t *regs, int param __attribute__((unused))) { LOG("auth: original login failure enum=%u", (unsigned)regs[24]); }
+static void auth_device_code(uint64_t *regs, int param __attribute__((unused))) {
     // This build's parser returns a libc++ string in fp-0x20 before moving it
     // into its user_code field. Observe only a bounded validated character count.
     unsigned char raw[24], chars[16]; uint64_t n, ptr, a = regs[29] - 0x20;
@@ -50,7 +50,7 @@ void dm_auth_observe_install(void) {
     for (int i = 0; i < g_nmod; i++) if (!strcmp(g_mod[i].name, "main") &&
         !strcmp(g_mod[i].build_id, "c6b32f4d3d4243ff190b082b4f6aea18")) match = 1;
     if (!match) return;
-    static const struct { int id; void (*fn)(const uint64_t *); } rows[] = {
+    static const struct { int id; void (*fn)(uint64_t *, int); } rows[] = {
         {OBS_AUTH_PRIMARY, auth_primary}, {OBS_AUTH_XAL_BEGIN, auth_xal_begin},
         {OBS_AUTH_DEVICE_CODE, auth_device_code}, {OBS_AUTH_XAL_RESULT, auth_xal_result},
         {OBS_AUTH_PLAYFAB, auth_playfab}, {OBS_AUTH_MINECRAFT, auth_minecraft},

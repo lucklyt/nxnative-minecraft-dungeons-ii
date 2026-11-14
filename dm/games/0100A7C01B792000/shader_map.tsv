@@ -1,5 +1,5 @@
-# kind: evidence  Minecraft Dungeons II shaders (provisional profile) (Unreal Engine shader code archives in RomFS + main) → control section + code area keys (dm/gfx/tools/shader_split.py)
-# column 5 records where each key first appears; this game has no PC version to pair with
+# kind: evidence  Minecraft Dungeons II shaders (Unreal Engine shader code archives in RomFS + main) → control section + code area keys (dm/gfx/tools/shader_split.py)
+# column 5 records where each key first appears; no PC shader pairing supplied
 package	index	stage	dm_ctl_sha16	source
 vs_game.bin	0	vertex	e3ba2415eb7507f8	/ue_shaders/ShaderArchive-Dungeons-SF_GLSL_SWITCH-SP_GLSL_SWITCH.ushaderbytecode#UE0
 ps_game.bin	0	pixel	5e2aaa5377650818	/ue_shaders/ShaderArchive-Dungeons-SF_GLSL_SWITCH-SP_GLSL_SWITCH.ushaderbytecode#UE1

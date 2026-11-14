@@ -1,6 +1,6 @@
 # Minecraft Dungeons II 1.1.3.0, Unreal Engine 5.6.1, main build c6b32f4d.
 # The native iPhone address space cannot hold the allocator's 38 GB pool reservation.
-# hle_uemalloc.c installs the verified UE5_6 vtable in the bss object before startup.
+# Upstream ue_malloc.py/ue_region.py now provide allocator and region adapters.
 CUTS = {
     'c6b32f4d3d4243ff190b082b4f6aea18': [
         # Platform-limit adaptation: local host users have no Nintendo NSAID.
@@ -9,7 +9,6 @@ CUTS = {
         # XAL authentication, callbacks, tokens and server responses downstream.
         (0x535fe90, 'ed19d097', '40a28094', 'Microsoft link description: local user eligibility follows NIFM availability'),
         (0x5633720, 'c9cbc497', '1c547594', 'Microsoft link action: local user eligibility follows NIFM availability'),
-        (0x143b0, '6c700294', '1f2003d5', 'nninitStartup: replace FMallocBinned3 constructor at 0xb0560 with host allocator'),
         (0x427d9f4, '61008052', '01008052', 'Prefer existing Microsoft provider 0 for native context/service; preserve actual account and token operations'),
         (0x427d9f8, '74008052', '14008052', 'Prefer existing Microsoft provider 0 for native context/service; preserve actual account and token operations'),
         (0x427dc44, '61008052', '01008052', 'Prefer existing Microsoft provider 0 for native context/service; preserve actual account and token operations'),
@@ -797,14 +796,18 @@ STUBS = {'c6b32f4d3d4243ff190b082b4f6aea18': microsoft_primary}
 # Optional DM_AUTH_TRACE observations, passive signed gates. The device-code
 # parser gate is after its string extraction call, before the move into user_code.
 OBS = {'c6b32f4d3d4243ff190b082b4f6aea18': [
-    (0x52c0e3c, 22, 'a9be7bfd', 'Microsoft primary flow entry'),
-    (0x4235908, 23, '2a2003f5', 'Real interactive XAL start result'),
-    (0x710542c, 24, '394002a8', 'Device user-code parser result (contents never logged)'),
-    (0x4243ddc, 25, '2a0003f4', 'Real interactive XAL completion result'),
-    (0x52a63f4, 26, 'd503201f', 'PlayFab audience request entry'),
-    (0x52a66e4, 27, '12001c08', 'Minecraft audience request entry'),
-    (0x52a6ed4, 28, 'f9401e80', 'Original Minecraft response callback entry'),
-    (0x52a43ac, 29, '91014320', 'Original login failure entry'),
-    (0x44a24f0, 30, '910123e0', 'Original cloud-list request entry'),
-    (0x44ab4ec, 31, 'f9401c00', 'Original cloud-list character delivery'),
+    (0x52c0e3c, 32, 'a9be7bfd', 'Microsoft primary flow entry'),
+    (0x4235908, 33, '2a2003f5', 'Real interactive XAL start result'),
+    (0x710542c, 34, '394002a8', 'Device user-code parser result (contents never logged)'),
+    (0x4243ddc, 35, '2a0003f4', 'Real interactive XAL completion result'),
+    (0x52a63f4, 36, 'd503201f', 'PlayFab audience request entry'),
+    (0x52a66e4, 37, '12001c08', 'Minecraft audience request entry'),
+    (0x52a6ed4, 38, 'f9401e80', 'Original Minecraft response callback entry'),
+    (0x52a43ac, 39, '91014320', 'Original login failure entry'),
+    (0x44a24f0, 40, '910123e0', 'Original cloud-list request entry'),
+    (0x44ab4ec, 41, 'f9401c00', 'Original cloud-list character delivery'),
 ]}
+
+BINDING = [{'what': 'Microsoft primary login, account restore and audience providers',
+            'now': 'build', 'goal': 'unreviewed', 'purpose': 'runtime',
+            'why': 'Signed adapters depend on verified game-specific identity layouts and original callback sites; unknown updates remain disabled.'}]

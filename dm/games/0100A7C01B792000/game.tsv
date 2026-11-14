@@ -22,9 +22,7 @@ romfs_marker	Dungeons/Content/Paks/Dungeons-Switch.ucas
 zip_store	.cache:.headers:.mp4:.pak:.ttf:.txt:.ucas:.utoc:.metallib
 
 # ---- Memory ----
-# Cap Unreal address reservations after replacing FMallocBinned3 with the host zone.
-game_args	-SwitchVirtualAddressSpaceSize=4064
-# The build-gated allocator cut and SDK node-area cut let the capped engine region fit this block.
+# Upstream allocator/region matching sizes Unreal to this iPhone-compatible block.
 mem_reserve	0x140000000
 mem_alias	0x118000000
 mem_stack	0x10000000
@@ -37,10 +35,15 @@ sys_resource	0x1400000
 network_default	1
 
 # ---- Frame rate ----
-# The build-gated Unreal cvar rows raise t.MaxFPS to 60 and rhi.SyncInterval to 1.
+# Unreal cvars are now found by name by the shared rewriter.
 fps_target	60
 
 # ---- Shader split ----
 # the decoded shader code archives: the engine's global shaders and the game's material shaders
 shader_groups	ShaderArchive-Global-=global ShaderArchive-=game
 shader_note	Minecraft Dungeons II shaders
+
+# Upstream rendering fixes for this exact game build.
+depth_mode	zero
+tex_dyn_slots	on
+fps_max	120

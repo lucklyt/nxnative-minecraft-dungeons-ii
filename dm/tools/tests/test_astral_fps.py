@@ -13,6 +13,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 try:
     import unicorn as uc
+    from unicorn.unicorn import Uc
     from unicorn import arm64_const as arm
 except ImportError:
     uc = arm = None
@@ -26,7 +27,7 @@ class Timing(unittest.TestCase):
     base, area, state, obj, stack = 0x4000000, 0x2000000, 0x10cec000, 0x6000000, 0x6100000
 
     def setUp(self):
-        self.u = uc.Uc(uc.UC_ARCH_ARM64, uc.UC_MODE_ARM)
+        self.u = Uc(uc.UC_ARCH_ARM64, uc.UC_MODE_ARM)
         for a, n in ((self.base, 0xe00000), (self.area, 0x20000), (self.state, 0x4000), (self.obj, 0x1000), (self.stack, 0x10000)):
             self.u.mem_map(a, n)
         self.cursor = self.area - self.base

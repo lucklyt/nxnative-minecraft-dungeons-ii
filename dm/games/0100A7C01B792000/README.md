@@ -17,6 +17,49 @@ original level-100 cloud-save uploads (HTTP 201, final status 200). Automatic
 cold restoration and primary-account status reporting passed signed-device tests;
 see the validation and open issues below.
 
+## Upstream synchronization (2026-11-14)
+
+Merged upstream `b06f4e0e` while retaining this fork's Microsoft login,
+audience providers, cloud upload fixes, account restoration and default
+networking. The 5 GB iPhone guest block remains; upstream's 64 GB Mac bring-up
+profile is not used on the phone. Shader keys are unchanged (15,826); upstream
+shader facts and tables, dynamic particle slots and zero-near depth mode are
+included.
+
+Allocator discovery, engine-region sizing, frame-rate cvars and display frame
+history now use upstream's shared implementations. The old fixed allocator cut
+and `-SwitchVirtualAddressSpaceSize` argument are removed to avoid applying two
+allocator/region mechanisms. Microsoft adapters remain exact-build gated.
+Authentication observation IDs moved to 32–41 to avoid upstream's new region
+gates at 22–26; observers use upstream's writable-register/parameter ABI but
+remain read-only. Online HTTPS and upstream offline HTML applets are separate
+source files. Offline local event descriptors retain upstream's behavior;
+native transport and verified TLS remain active when networking is enabled.
+
+This merge has not been installed or tested on an iPhone. Earlier phone login
+and cloud-save results in this note refer to the pre-merge build. The regression
+harness covers the only locally available game, this title, because it exercises
+this fork's Unreal, NVN and Microsoft paths; other games are unchecked. Its
+report `20261114-085845-chain` is blocked by the baseline's missing locked Metal
+compilers. No tool lock was changed. C lint is blocked by missing clang-tidy
+(LLVM 23); Python import typing was updated to use the Unicorn class definitions directly
+so the optional ARM64 tests can be checked with Unicorn installed.
+
+Merge validation: the final Mac host build, complete host test suite and
+158 Python/ARM64/profile/iOS workflow tests pass. All three original NSOs rewrite
+successfully with the new shared mechanisms and the 12 Microsoft adapters;
+the main has 12 observation gates (two allocator/region plus ten auth stages).
+Actual iOS source generation with Xcode includes the Microsoft diagnostics,
+native HTTPS UI and upstream offline HTML UI. Python lint has zero new findings
+and its baseline shrank from 321 to 316. All graphics test executables compile. The first two runtime tests
+(`t_addr_known`, 14 checks; `t_alias_takeover`, 46 checks) pass; the suite then
+stops at `check_t_alpha` because `xcrun metal` cannot compile its fixture (exit
+72, missing Metal toolchain). Remaining GPU tests were not run. The initial
+attempt used the system Python 3.9; rerunning with the shared Python 3.14 venv
+reaches the Metal-tool blocker above. Final native transport, TLS upload/C ABI,
+web and offline SSL-context tests pass after the last resolver hook merge.
+No iPhone runtime result is claimed for this merge.
+
 ## Reproducing this build
 
 For packaging and installation, follow the root
@@ -64,7 +107,10 @@ sites before registering its builds. This profile does not opt into automatic
 function-matched cuts; a successful package build for another version does not
 establish that these adaptations apply or that the game boots.
 
-## What it needs
+## Original bring-up requirements (historical)
+
+The table below records the pre-merge fixed-address implementation. Current
+allocator and region sizing use upstream discovery, as described above.
 
 | Setting | Where | Why |
 |---|---|---|
@@ -76,12 +122,22 @@ establish that these adaptations apply or that the game boots.
 
 ## Memory
 
+Current: the profile retains the tested 5 GB guest block. The shared rewriter
+finds the allocator constructor/vtable and engine-region store; SDK function
+matching reduces the node area to 62 MB. The original manual allocator cut and
+engine-size argument described in the bring-up history below are no longer used.
+
 See [Unreal's FMallocBinned3 replaced by the host allocator](../../../docs/reference/memory.md#unreals-fmallocbinned3-replaced-by-the-host-allocator) for the shared mechanism.
 
 - **Unreal Engine 5.6.1 FMallocBinned3 Replacement**: `nninitStartup` constructs an FMallocBinned3 in the BSS at `main+0x997e228`. The original constructor call at `main+0x143b0` (`bl 0xb0560`) would reserve ~38 GB of address space. The rewriter cuts this call to `nop` via `patches.py`, and `hle_uemalloc.c` (slot layout `UE5_6`, 32 slots) installs the host allocator on a dedicated malloc zone before any guest code runs.
 - **Address Space Sizing**: With `game_args -SwitchVirtualAddressSpaceSize=4064` and the SDK's AddressRegionManager node-area cut (1022 MB → 62 MB), the guest reservation is capped to 5 GB (`mem_reserve 0x140000000`, `mem_alias 0x118000000`). Both the Mac and iPhone 16 Pro reach `nnMain` and initialize the heap; sustained iPhone gameplay remains unverified.
 
 ## Frame rate
+
+Current: upstream name-based cvar discovery replaces the fixed-address
+`hle_fpslock.c` rows below. The profile defaults to 60 FPS; the new shared
+120 FPS option is available, but this merged fork has not validated it on a
+phone. The measurements below describe earlier builds.
 
 The profile requests 60 fps. Build-gated `hle_fpslock.c` entries update both
 game/render-thread copies of Unreal's `t.MaxFPS` and `rhi.SyncInterval`.
@@ -470,3 +526,13 @@ Validation so far: host unit tests, the SSL lifecycle test with ASan/UBSan,
 the frame-history lifecycle test with ASan/UBSan, documentation checks, and the static regression harness over the locally
 available game (15,826 shaders, zero newly failing or changed shader outputs).
 These checks do not establish playability.
+
+## Found on this game
+
+- [Compute dispatches past the pipeline's thread limit](../../../docs/reference/shaders.md#compute-dispatches-past-the-pipelines-thread-limit): resolved, found offline (no M1 or M2 run): compute shader `ce4e9fdf514d0196` (8x8x8) took 124 registers on `applegpu_g13s` / `applegpu_g14g`, which allows 384 threads, so on an M1 or M2 its dispatches ran nothing; 104 with the local size on the kernel. What it draws is not known.
+- [Unreal's frame limit and present interval, found by name](../../../docs/reference/frame-rate.md#unreals-frame-limit-and-present-interval-found-by-name): 60 and 120 by `rhi.SyncInterval` alone
+- [Layer frame history](../../../docs/reference/services.md#layer-frame-history)
+- [The offline pages of a sparse base game stop the build as a damaged NSP](../../../docs/reference/packing.md#the-offline-pages-of-a-sparse-base-game-stop-the-build-as-a-damaged-nsp)
+- [The survey's build ID lookup stops on the base game alone with a hash error](../../../docs/reference/packing.md#the-surveys-build-id-lookup-stops-on-the-base-game-alone-with-a-hash-error)
+- [A shader build leaves a file per shader output while it runs or after a stop](../../../docs/reference/packing.md#a-shader-build-leaves-a-file-per-shader-output-while-it-runs-or-after-a-stop): measured here, its 61,655 library files the same under the new chain
+- [Writes beside a packaged texture in a shared host page](../../../docs/reference/nvn-objects.md#writes-beside-a-packaged-texture-in-a-shared-host-page): after GPU stores into packaged textures' storage, 17 small textures were uploaded again by writes beside them, until the stores wrote their edge bytes too

@@ -7,18 +7,23 @@ uint64_t now_ns(void) { return 1; }
 static int64_t slept_ns;
 void dm_guest_sleep_ns(int64_t n) { slept_ns=n; }
 void dm_thread_native_wait(int entering) { (void)entering; }
-void dm_bigstack_enter(void) { abort(); } // This unit calls implementations directly, never registered entry stubs.
 
+uint64_t guest_ns(void) { return now_ns(); }
+int dm_detclock_enabled(void) { return 0; }
+void dm_guest_cond_wait_ns(pthread_cond_t *c, pthread_mutex_t *m, int64_t ns) {
+    struct timespec t = {ns / 1000000000, ns % 1000000000};
+    pthread_cond_timedwait_relative_np(c, m, &t);
+}
 int main(void) {
     unsetenv("DM_NETWORK");
     assert(dm_sk_poll(NULL,0,33)==0 && slept_ns==33000000);
     assert(dm_sk_poll(NULL,0,-1)==0 && slept_ns==100000000);
     struct { int32_t fd; int16_t events,revents; } idle={-1,1,7};
     assert(dm_sk_poll(&idle,1,0)==0 && !idle.revents);
-    idle.fd=32; assert(dm_sk_poll(&idle,1,0)==-1 && dm_net_errno()==50);
+    idle.fd=32; assert(dm_sk_poll(&idle,1,0)==0 && !idle.revents);
     int64_t tv[2]={0,50000}; uint64_t empty[16]={0};
     assert(dm_sk_select(1024,empty,NULL,NULL,tv)==0 && slept_ns==50000000);
-    empty[0]=1; assert(dm_sk_select(1,empty,NULL,NULL,tv)==-1 && dm_net_errno()==50);
+    empty[0]=1; assert(dm_sk_select(1,empty,NULL,NULL,tv)==0 && !empty[0]);
     uint64_t a = 0, b = 0;
     assert(h_ssl_CtxCreate(NULL, 1) != RES_OK);
     assert(h_ssl_CtxCreate(&a, 0) != RES_OK && a == 0);

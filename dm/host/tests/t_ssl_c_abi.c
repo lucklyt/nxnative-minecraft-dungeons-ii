@@ -6,7 +6,12 @@
 uint64_t now_ns(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (uint64_t)t.tv_sec*1000000000+t.tv_nsec; }
 void dm_guest_sleep_ns(int64_t n) { struct timespec t={n/1000000000,n%1000000000}; nanosleep(&t,NULL); }
 void dm_thread_native_wait(int entering) { (void)entering; }
-void dm_bigstack_enter(void) { abort(); } // Implementations are called directly.
+uint64_t guest_ns(void) { return now_ns(); }
+int dm_detclock_enabled(void) { return 0; }
+void dm_guest_cond_wait_ns(pthread_cond_t *c, pthread_mutex_t *m, int64_t ns) {
+    struct timespec t = {ns / 1000000000, ns % 1000000000};
+    pthread_cond_timedwait_relative_np(c, m, &t);
+}
 int main(int argc,char **argv) {
     assert(argc==4); unsigned port=(unsigned)atoi(argv[1]);
     unsetenv("DM_NETWORK"); uint64_t ctx=0,cn=0,id=0;

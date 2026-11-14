@@ -1,6 +1,6 @@
 // Malformed applet buffers must not overrun guest memory or return partial URLs.
 #define DM_WEB_TEST 1
-#include "../hle_web.c"
+#include "../hle_web_online.c"
 #include <assert.h>
 static void entry(unsigned char *buf, unsigned *pos, uint16_t type, const char *value, uint16_t len) {
     *pos=(unsigned)put(buf,*pos,type,value,len);
