@@ -77,11 +77,13 @@ On an Apple Silicon Mac, install Xcode and Homebrew, then run:
 ```sh
 git clone https://github.com/lucklyt/nxnative-minecraft-dungeons-ii.git
 cd nxnative-minecraft-dungeons-ii
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+xcodebuild -downloadComponent MetalToolchain
 brew install xcodegen zstd spirv-cross glslang
 brew install --cask dotnet-sdk
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install lz4 capstone fonttools "backports.zstd; python_version < '3.14'"
+python3 -m pip install lz4 "capstone>=5,<6" fonttools zbic "backports.zstd; python_version < '3.14'"
 ```
 
 If you already cloned this fork, run `git pull` before rebuilding. Put the base

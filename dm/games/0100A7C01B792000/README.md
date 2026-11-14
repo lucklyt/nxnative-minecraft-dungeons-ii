@@ -60,6 +60,20 @@ reaches the Metal-tool blocker above. Final native transport, TLS upload/C ABI,
 web and offline SSL-context tests pass after the last resolver hook merge.
 No iPhone runtime result is claimed for this merge.
 
+## iPad packaging (2026-11-14)
+
+The normal NSP pipeline now registers the update's actual package version,
+`v131072`, instead of the old manual `v1` label. Module build IDs are unchanged.
+This avoids an unnecessary derived profile when packing the supported update.
+The root build instructions include the current `zbic` dependency, selecting
+Xcode and downloading its Metal toolchain.
+
+With the exact locked Metal compiler 32023.922 installed, all 15,826 base shaders
+and the generated readable-tile, shadow-input, alpha/logic and pulling variants
+compiled successfully for iOS. The Release app signed with an iPad-specific
+provisioning profile and installed on iPadOS 27.2.1. This is build/install
+validation; gameplay and Microsoft cloud-save tests on this iPad are pending.
+
 ## Reproducing this build
 
 For packaging and installation, follow the root
